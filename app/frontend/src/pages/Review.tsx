@@ -9,6 +9,7 @@ import type { Op } from '../editing';
 import { applyOpsPreview, describeOps, touchedIds } from '../editing';
 import type {
   Fixture,
+  OpeningType,
   PlanGeometry,
   QueuedComment,
   RegisterHunk,
@@ -20,7 +21,11 @@ import type {
 } from '../types';
 import { emptySelection, hasSelection } from '../types';
 
-type Clipboard = { kind: 'room'; data: Room } | { kind: 'fixture'; data: Fixture } | null;
+type Clipboard =
+  | { kind: 'room'; data: Room }
+  | { kind: 'fixture'; data: Fixture }
+  | { kind: 'opening'; data: { wallId: string; type: OpeningType; t0: number; t1: number } }
+  | null;
 
 interface Props {
   reviewId: string;
@@ -154,6 +159,35 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
         return;
       }
 
+      // Cmd/Ctrl+Z — undo the last pending op, else roll back the last applied version
+      if (mod && key === 'z') {
+        if (pending.length > 0) {
+          e.preventDefault();
+          setPending((p) => p.slice(0, -1));
+        } else if (review.head_n && review.head_n > 0 && !busy) {
+          e.preventDefault();
+          const h = review.head_n;
+          setBusy(true);
+          setBanner({ kind: 'busy', text: `Undoing v${String(h).padStart(2, '0')}…` });
+          api
+            .deleteVersion(reviewId, h)
+            .then((res) => {
+              setBusy(false);
+              setBanner({
+                kind: 'ok',
+                text: `Undid v${String(res.deleted).padStart(2, '0')} — v${String(res.head_n).padStart(2, '0')} is editable.`,
+              });
+              return loadReview(true);
+            })
+            .then(() => onVersionAdded?.())
+            .catch((e2) => {
+              setBusy(false);
+              setBanner({ kind: 'error', text: friendly(e2) });
+            });
+        }
+        return;
+      }
+
       if (mod && key === 'c') {
         if (selection.rooms.length === 1) {
           const r = detail.geometry.rooms.find((r) => r.id === selection.rooms[0]);
@@ -165,6 +199,14 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
           const f = detail.geometry.fixtures.find((f) => f.id === selection.fixtures[0]);
           if (f) {
             setClipboard({ kind: 'fixture', data: f });
+            e.preventDefault();
+          }
+        } else if (selection.openings.length === 1) {
+          const os = selection.openings[0];
+          const w = detail.geometry.walls.find((w) => w.id === os.wallId);
+          const o = w?.openings.find((o) => o.id === os.id);
+          if (w && o) {
+            setClipboard({ kind: 'opening', data: { wallId: w.id, type: o.type, t0: o.t0, t1: o.t1 } });
             e.preventDefault();
           }
         }
@@ -179,18 +221,34 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
             ...p,
             { op: 'add_room', name: `${r.name} copy`, kind: r.kind, x: r.x + r.w + 0.15, y: r.y, w: r.w, h: r.h, fill: r.fill },
           ]);
-        } else {
+        } else if (clipboard.kind === 'fixture') {
           const f = clipboard.data;
           setPending((p) => [
             ...p,
             { op: 'add_fixture', x: f.x + 0.3, y: f.y + 0.3, w: f.w, h: f.h, label: f.label ? `${f.label} copy` : '' },
           ]);
+        } else {
+          // paste a matching opening onto the same wall, shifted along it (before if it won't fit after)
+          const { wallId, type, t0, t1 } = clipboard.data;
+          const len = t1 - t0;
+          const gap = 0.06;
+          let n0 = t1 + gap;
+          let n1 = n0 + len;
+          if (n1 > 1) {
+            n1 = t0 - gap;
+            n0 = n1 - len;
+          }
+          if (n0 >= 0 && n1 <= 1) {
+            setPending((p) => [...p, { op: 'add_opening', wall_id: wallId, t0: n0, t1: n1, type }]);
+          } else {
+            setBanner({ kind: 'error', text: 'No room on this wall to paste the opening — widen the wall or pick another.' });
+          }
         }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selection, currentN, review, detail, clipboard]);
+  }, [selection, currentN, review, detail, clipboard, pending, busy, reviewId, loadReview, onVersionAdded]);
 
   if (!review || currentN === null || !detail) {
     return <div className="banner">Loading review…</div>;

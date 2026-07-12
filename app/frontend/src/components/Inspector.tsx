@@ -147,13 +147,32 @@ export default function Inspector({
               </button>
             ))}
             <button
+              className="ghost"
+              title="Duplicate this opening along the same wall"
+              onClick={() => {
+                const len = opening.t1 - opening.t0;
+                const gap = 0.06;
+                let n0 = opening.t1 + gap;
+                let n1 = n0 + len;
+                if (n1 > 1) {
+                  n1 = opening.t0 - gap;
+                  n0 = n1 - len;
+                }
+                if (n0 >= 0 && n1 <= 1) {
+                  onOps([{ op: 'add_opening', wall_id: openingWall.id, t0: n0, t1: n1, type: opening.type }]);
+                }
+              }}
+            >
+              Duplicate
+            </button>
+            <button
               className="ghost danger"
               onClick={() => onOps([{ op: 'remove_opening', opening_id: opening.id }])}
             >
               remove
             </button>
           </div>
-          <div className="note">Drag the handles on the plan to move its ends.</div>
+          <div className="note">Drag the handles on the plan to move its ends · Ctrl+C / Ctrl+V to copy.</div>
         </div>
       )}
 
@@ -297,8 +316,17 @@ function RoomEditor({ room, onOps }: { room: { id: string; name: string; kind: s
       </div>
       <div className="frow one">
         <label className="f">
-          <span>Name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <span>Name — edit and press Enter</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                queue();
+              }
+            }}
+          />
         </label>
       </div>
       <div className="frow">
@@ -372,6 +400,21 @@ function FixtureEditor({
     Math.abs(rect.x - fixture.x) + Math.abs(rect.y - fixture.y) + Math.abs(rect.w - fixture.w) + Math.abs(rect.h - fixture.h) >
       1e-9;
 
+  const queue = () => {
+    if (!dirty) return;
+    onOps([
+      {
+        op: 'modify_fixture',
+        fixture_id: fixture.id,
+        ...(label !== fixture.label ? { label } : {}),
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+      },
+    ]);
+  };
+
   return (
     <div className="body inspector-pane">
       <div className="what">
@@ -380,29 +423,23 @@ function FixtureEditor({
       </div>
       <div className="frow one">
         <label className="f">
-          <span>Label</span>
-          <input value={label} placeholder="e.g. island bench" onChange={(e) => setLabel(e.target.value)} />
+          <span>Label — edit and press Enter</span>
+          <input
+            value={label}
+            placeholder="e.g. island bench"
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                queue();
+              }
+            }}
+          />
         </label>
       </div>
       <RectFields rect={rect} onChange={setRect} minSide={0.2} />
       <div className="btnrow">
-        <button
-          className="primary"
-          disabled={!dirty}
-          onClick={() =>
-            onOps([
-              {
-                op: 'modify_fixture',
-                fixture_id: fixture.id,
-                ...(label !== fixture.label ? { label } : {}),
-                x: rect.x,
-                y: rect.y,
-                w: rect.w,
-                h: rect.h,
-              },
-            ])
-          }
-        >
+        <button className="primary" disabled={!dirty} onClick={queue}>
           Queue edit
         </button>
         <button

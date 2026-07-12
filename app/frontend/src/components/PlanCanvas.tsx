@@ -344,6 +344,7 @@ export default function PlanCanvas({
           .filter((r) => r.z === 0)
           .map((r) => {
             const lr = liveRect('room', r.id, r);
+            const isNew = r.id.startsWith('pv-room');
             return (
               <rect
                 key={`fill-${r.id}`}
@@ -351,7 +352,7 @@ export default function PlanCanvas({
                 y={Y(lr.y)}
                 width={px(lr.w)}
                 height={px(lr.h)}
-                fill={r.fill === 'grey' ? GREY : '#fff'}
+                fill={isNew ? 'rgba(26,127,55,0.14)' : r.fill === 'grey' ? GREY : '#fff'}
               />
             );
           })}
@@ -510,17 +511,19 @@ export default function PlanCanvas({
               .filter((r) => pendingIds.has(r.id) || r.id.startsWith('pv-room'))
               .map((r) => {
                 const lr = liveRect('room', r.id, r);
+                const isNew = r.id.startsWith('pv-room');
+                // new rooms get a solid green boundary (walls derive on apply); edits stay amber
                 return (
                   <rect
                     key={`pend-${r.id}`}
-                    x={X(lr.x) - 3}
-                    y={Y(lr.y) - 3}
-                    width={px(lr.w) + 6}
-                    height={px(lr.h) + 6}
+                    x={X(lr.x) - (isNew ? 1 : 3)}
+                    y={Y(lr.y) - (isNew ? 1 : 3)}
+                    width={px(lr.w) + (isNew ? 2 : 6)}
+                    height={px(lr.h) + (isNew ? 2 : 6)}
                     fill="none"
-                    stroke={AMBER}
-                    strokeWidth={2.5}
-                    strokeDasharray="4 3"
+                    stroke={isNew ? GREEN : AMBER}
+                    strokeWidth={isNew ? 3 : 2.5}
+                    strokeDasharray={isNew ? undefined : '4 3'}
                   />
                 );
               })}
