@@ -1,0 +1,1001 @@
+<title>Floor-Plan Studio — Frontend Improvement Plan</title>
+<style>
+  :root {
+    --ink: #141416;
+    --paper: #ffffff;
+    --grey: #e1e1e3;
+    --grey-2: #f4f4f5;
+    --faint: #74747a;
+    --red: #e23d28;
+    --green: #1a7f37;
+    --green-bg: #e6f4ea;
+    --red-bg: #fdecea;
+    --amber: #9a6700;
+    --amber-bg: #fff3d6;
+    --mono: 'SF Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; min-width: 0; }
+  :where(p, h1, h2, h3, h4, li, td, th, dd, figcaption) { overflow-wrap: anywhere; }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.5;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 22px 80px; }
+  header.site { border-bottom: 4px solid var(--ink); padding-bottom: 16px; margin-bottom: 26px; }
+  .kicker { font-size: 12px; letter-spacing: 0.22em; color: var(--faint); text-transform: uppercase; }
+  h1 { margin: 8px 0 4px; font-size: 26px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .sub { color: var(--faint); font-size: 14px; max-width: 74ch; }
+  .statline { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .stat { border: 2px solid var(--ink); padding: 6px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .stat b { font-size: 15px; letter-spacing: 0; display: block; }
+  .stat.now { background: var(--ink); color: var(--paper); }
+
+  section { margin: 40px 0; }
+  h2.sec {
+    font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase;
+    border-bottom: 3px solid var(--ink); padding-bottom: 8px; margin: 0 0 6px;
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  }
+  h2.sec .n { color: var(--red); }
+  h2.sec small { color: var(--faint); letter-spacing: 0.04em; font-weight: 400; text-transform: none; font-size: 12.5px; }
+  .lede { font-size: 14px; color: var(--ink); max-width: 80ch; margin: 10px 0 16px; }
+  .lede em { color: var(--faint); }
+
+  .card { border: 3px solid var(--ink); background: var(--paper); margin: 14px 0; }
+  .card > h3 {
+    margin: 0; padding: 8px 12px; font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase;
+    border-bottom: 3px solid var(--ink); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  }
+  .card > h3 small { color: var(--faint); letter-spacing: 0.03em; font-weight: 400; text-transform: none; }
+  .card .body { padding: 14px; }
+
+  table.list { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  table.list td, table.list th { border-bottom: 1px solid var(--grey); padding: 8px 9px; text-align: left; vertical-align: top; }
+  table.list th { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 2px solid var(--ink); white-space: nowrap; }
+  .tbl-scroll { overflow-x: auto; }
+  code, .code { font-family: var(--mono); font-size: 12.5px; background: var(--grey-2); padding: 1px 5px; }
+  .chip { display: inline-block; border: 1.5px solid var(--red); color: var(--red); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.05em; padding: 1px 7px; white-space: nowrap; }
+  .chip.ok { border-color: var(--green); color: var(--green); }
+  .chip.dim { border-color: var(--grey); color: var(--faint); }
+  .chip.amber { border-color: var(--amber); color: var(--amber); }
+  .chip.ink { border-color: var(--ink); color: var(--ink); }
+  .sev { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; padding: 2px 7px; text-transform: uppercase; white-space: nowrap; }
+  .sev.p1 { background: var(--red); color: #fff; }
+  .sev.p2 { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber); }
+  .sev.p3 { background: var(--grey-2); color: var(--faint); border: 1px solid var(--grey); }
+
+  /* ---------- product mock ---------- */
+  .mockframe { border: 3px solid var(--ink); box-shadow: 8px 8px 0 var(--grey); margin: 18px 0 8px; overflow: hidden; }
+  .mockbar { display: flex; gap: 6px; align-items: center; padding: 7px 10px; border-bottom: 3px solid var(--ink); background: var(--grey-2); }
+  .mockbar i { width: 10px; height: 10px; border: 2px solid var(--ink); border-radius: 50%; display: inline-block; }
+  .mockbar .url { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-left: 8px; }
+  .shell { display: grid; grid-template-columns: 218px minmax(0, 1fr); min-height: 480px; }
+  @media (max-width: 760px) { .shell { grid-template-columns: minmax(0,1fr); } .snav { display:none; } }
+  .snav { background: var(--ink); color: var(--paper); display: flex; flex-direction: column; }
+  .snav .brand { padding: 16px 16px 12px; border-bottom: 1px solid #3a3a3e; }
+  .snav .brand .b1 { font-size: 13px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+  .snav .brand .b2 { font-size: 10px; color: #9c9ca4; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 2px; }
+  .snav .group { font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: #8b8b93; padding: 14px 16px 6px; }
+  .snav a.item { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; color: var(--paper);
+    text-decoration: none; font-size: 12.5px; padding: 8px 16px; border-left: 3px solid transparent; }
+  .snav a.item:hover { background: #232327; }
+  .snav a.item.active { border-left-color: var(--red); background: #232327; }
+  .snav a.item .k { font-family: var(--mono); font-size: 10px; color: #9c9ca4; }
+  .snav .addr { display: block; color: var(--paper); text-decoration: none; padding: 9px 16px; border-left: 3px solid transparent; }
+  .snav .addr:hover { background: #232327; }
+  .snav .addr.active { border-left-color: var(--red); background: #232327; }
+  .snav .addr .a1 { font-size: 12px; font-weight: 700; line-height: 1.3; }
+  .snav .addr .a2 { font-size: 10.5px; color: #9c9ca4; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .snav .addr .up { color: #7ee2a8; font-weight: 700; }
+  .snav .addr .down { color: #ff8a75; font-weight: 700; }
+  .snav .foot { margin-top: auto; padding: 12px 16px; border-top: 1px solid #3a3a3e; font-size: 10.5px; color: #9c9ca4; display: flex; gap: 7px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; }
+
+  .smain { background: var(--paper); }
+  .ctxbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 3px solid var(--ink); }
+  .ctxbar .addr { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .ctxbar .cfg { font-size: 11.5px; color: var(--faint); }
+  .ctxbar .rent { margin-left: auto; display: flex; align-items: baseline; gap: 8px; font-size: 12px; }
+  .ctxbar .rent b { font-size: 16px; }
+  .ctxbar .rent .up { color: var(--green); font-weight: 700; }
+  .ctxbar .rent .down { color: var(--red); font-weight: 700; }
+  .subbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 16px; border-bottom: 1px solid var(--grey); background: var(--grey-2); }
+  .vpills { display: flex; gap: 4px; }
+  .vpills span { border: 2px solid var(--grey); background: var(--paper); font-size: 10.5px; font-weight: 700; padding: 2px 8px; }
+  .vpills span.on { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+  .mtabs { display: inline-flex; }
+  .mtabs span { border: 2px solid var(--ink); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 9px; margin-left: -2px; }
+  .mtabs span.on { background: var(--ink); color: var(--paper); }
+  .subbar .acts { margin-left: auto; font-size: 11px; color: var(--faint); display: flex; gap: 12px; }
+  .canvasarea { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 0; }
+  @media (max-width: 900px) { .canvasarea { grid-template-columns: minmax(0,1fr); } }
+  .canvasbox { padding: 12px; border-right: 1px solid var(--grey); }
+  .cvtools { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .cvtools span { border: 2px solid var(--ink); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 9px; background: var(--paper); }
+  .cvtools span.on { background: var(--ink); color: var(--paper); }
+  .cvtools span.ghost { border-color: var(--grey); color: var(--faint); font-weight: 400; }
+  .inspector { padding: 12px; }
+  .inspector h4 { margin: 0 0 2px; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; }
+  .inspector .what { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+  .inspector .what .chip { margin-left: 6px; }
+  .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .frow.one { grid-template-columns: 1fr; }
+  .f label { display: block; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); margin-bottom: 2px; }
+  .f .v { border: 2px solid var(--ink); padding: 5px 8px; font-size: 13px; font-family: var(--mono); background: var(--paper); }
+  .btn { display: inline-block; border: 3px solid var(--ink); background: var(--ink); color: var(--paper);
+    font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-size: 11px; padding: 7px 14px; }
+  .btn.alt { background: var(--paper); color: var(--ink); }
+  .callouts { list-style: none; margin: 14px 0 0; padding: 0; font-size: 13.5px; }
+  .callouts li { display: flex; gap: 10px; margin-bottom: 8px; }
+  .cnum { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--red); color: #fff;
+    font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; margin-top: 1px; }
+  .cmark { position: absolute; width: 20px; height: 20px; border-radius: 50%; background: var(--red); color: #fff;
+    font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 0 0 2px #fff; }
+  .relwrap { position: relative; }
+
+  .mermaid { display: flex; justify-content: center; margin: 10px 0; overflow-x: auto; }
+
+  pre.diffmock { font-family: var(--mono); font-size: 12px; line-height: 1.6; border: 1px solid var(--grey); padding: 10px; overflow-x: auto; margin: 8px 0; }
+  pre.diffmock .h { color: var(--faint); }
+  pre.diffmock .add { background: var(--green-bg); color: var(--green); display: block; }
+  pre.diffmock .del { background: var(--red-bg); color: var(--red); display: block; }
+  pre.diffmock .authchip { float: right; font-family: 'Helvetica Neue', Arial, sans-serif; }
+
+  .phase { display: grid; grid-template-columns: 88px minmax(0,1fr); border: 3px solid var(--ink); margin-bottom: 12px; }
+  .phase .pn { background: var(--ink); color: var(--paper); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 6px; }
+  .phase .pn b { font-size: 20px; }
+  .phase .pn span { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: #9c9ca4; text-align: center; }
+  .phase .pb { padding: 12px 14px; }
+  .phase .pb h4 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .phase .pb ul { margin: 6px 0; padding-left: 18px; font-size: 13.5px; }
+  .phase .pb li { margin-bottom: 4px; }
+  .phase .pb .accept { font-size: 12px; color: var(--faint); border-top: 1px solid var(--grey); margin-top: 8px; padding-top: 7px; }
+  .phase .pb .accept b { color: var(--green); text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; }
+
+  .decision { border: 3px solid var(--ink); margin-bottom: 16px; }
+  .decision h3 { margin: 0; padding: 8px 12px; font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; border-bottom: 3px solid var(--ink); background: var(--grey-2); }
+  .decision .body { padding: 12px 14px; }
+  .decision label.opt { display: flex; gap: 10px; align-items: flex-start; border: 2px solid var(--grey); padding: 10px 12px; margin-bottom: 8px; cursor: pointer; font-size: 13.5px; }
+  .decision label.opt:hover { border-color: var(--ink); }
+  .decision label.opt input { margin-top: 3px; accent-color: var(--red); }
+  .decision label.opt b { display: block; font-size: 13px; }
+  .decision label.opt .why { color: var(--faint); font-size: 12.5px; }
+  .decision .rec { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: var(--green); text-transform: uppercase; margin-left: 6px; }
+  .decision button { border: 3px solid var(--ink); background: var(--ink); color: var(--paper); font: inherit;
+    font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-size: 11px; padding: 7px 14px; cursor: pointer; }
+  .decision button:hover { background: var(--red); border-color: var(--red); }
+  .queued-note { font-size: 11.5px; color: var(--green); margin-top: 6px; display: none; }
+
+  /* ---------- object gallery ---------- */
+  .objgallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 14px 0; }
+  .obj { border: 2px solid var(--ink); background: var(--paper); }
+  .obj h4 { margin: 0; padding: 6px 10px; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+    border-bottom: 2px solid var(--ink); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .obj svg { display: block; width: 100%; background: #fff; }
+  .obj .cap { font-size: 11px; color: var(--faint); padding: 7px 10px; border-top: 1px solid var(--grey); }
+
+  /* ---------- style-guide options ---------- */
+  .styleopts { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; margin: 16px 0; }
+  @media (max-width: 980px) { .styleopts { grid-template-columns: minmax(0,1fr); } }
+  .sopt { border: 3px solid var(--ink); padding: 12px; display: flex; flex-direction: column; }
+  .sopt-tag { font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 8px; }
+  .sopt h4 { margin: 12px 0 4px; font-size: 13.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .sopt p { font-size: 12.5px; margin: 0 0 8px; color: var(--ink); }
+  .sopt ul { margin: 0; padding-left: 16px; font-size: 12px; color: var(--faint); }
+  .sopt ul li { margin-bottom: 3px; }
+  .sg { border: 1px solid var(--grey); overflow: hidden; }
+  .sg-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 8px 10px; flex-wrap: wrap; }
+  .sg-brand { font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; }
+  .sg-stat { font-size: 10.5px; font-family: var(--mono); }
+  .sg-stat b { font-size: 12.5px; }
+  .sg-body { padding: 10px; }
+  .sg-h1 { font-weight: 700; font-size: 14px; }
+  .sg-sub { font-size: 10.5px; margin: 1px 0 8px; }
+  .sg-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .sg-btn { font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 9px; }
+  .sg-chip { font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 6px; }
+  .sg-plan { height: 54px; position: relative; }
+  .sg-plan span { position: absolute; inset: 8px 12px; background: #fff; border: 3px solid #141416; }
+  .sg-plan span::after { content: ""; position: absolute; left: 40%; top: 0; bottom: 40%; border-left: 2.5px solid #141416; }
+  .sg-plan span::before { content: ""; position: absolute; left: 40%; right: 0; top: 60%; border-top: 2.5px solid #141416; }
+  /* A — Drafting Ink */
+  .sg-a { background: #fff; color: #141416; border: 2px solid #141416; }
+  .sg-a .sg-head { border-bottom: 3px solid #141416; }
+  .sg-a .sg-h1 { text-transform: uppercase; letter-spacing: 0.05em; }
+  .sg-a .sg-sub, .sg-a .sg-stat em { color: #74747a; font-style: normal; }
+  .sg-a .sg-stat em { color: #1a7f37; }
+  .sg-a .sg-btn { background: #141416; color: #fff; border: 2px solid #141416; }
+  .sg-a .sg-btn.ghost { background: #fff; color: #141416; }
+  .sg-a .sg-chip { border: 1.5px solid #e23d28; color: #e23d28; }
+  /* B — Blueprint */
+  .sg-b { background: #0e1c2e; color: #dce8f5; }
+  .sg-b .sg-head { border-bottom: 1px solid #2a4363; background: #142a44; }
+  .sg-b .sg-h1 { font-family: var(--mono); letter-spacing: 0.02em; }
+  .sg-b .sg-sub { color: #7e97b5; }
+  .sg-b .sg-stat em { color: #ffb347; font-style: normal; }
+  .sg-b .sg-btn { background: #4cc3ff; color: #0e1c2e; border: 1px solid #4cc3ff; }
+  .sg-b .sg-btn.ghost { background: transparent; color: #dce8f5; border: 1px solid #3d5a7e; }
+  .sg-b .sg-chip { border: 1px solid #4cc3ff; color: #4cc3ff; }
+  .sg-b .sg-plan span { box-shadow: 0 0 0 4px #142a44, 0 0 18px rgba(76,195,255,0.25); }
+  /* C — Editorial Estate */
+  .sg-c { background: #faf8f4; color: #1f1d1a; border: 1px solid #e6e1d8; }
+  .sg-c .sg-head { border-bottom: 1px solid #e6e1d8; }
+  .sg-c .sg-h1 { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 15px; text-transform: none; }
+  .sg-c .sg-sub { color: #8a8377; }
+  .sg-c .sg-stat em { color: #2e5d4b; font-style: normal; font-weight: 700; }
+  .sg-c .sg-btn { background: #2e5d4b; color: #faf8f4; border: 1px solid #2e5d4b; border-radius: 3px; }
+  .sg-c .sg-btn.ghost { background: transparent; color: #b08d3e; border: 1px solid #b08d3e; border-radius: 3px; }
+  .sg-c .sg-chip { border: 1px solid #b08d3e; color: #b08d3e; border-radius: 3px; }
+  .sg-c .sg-plan span { box-shadow: 0 1px 4px rgba(31,29,26,0.12); border-radius: 2px; }
+
+  .risk { border-left: 4px solid var(--amber); background: var(--grey-2); padding: 10px 12px; margin-bottom: 10px; font-size: 13.5px; }
+  .risk b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .risk .mit { color: var(--faint); font-size: 12.5px; }
+  footer { margin-top: 48px; font-size: 11.5px; color: var(--faint); text-align: center; border-top: 1px solid var(--grey); padding-top: 16px; }
+</style>
+
+<div class="wrap">
+  <header class="site">
+    <div class="kicker">Floor-Plan Studio · frontend improvement plan · 2026-07-12</div>
+    <h1>One plan, two editors — humans and the agent share the canvas</h1>
+    <div class="sub">
+      Plan for the five pieces of feedback plus my own step-through of the running app
+      (localhost:5175, seed review at v04). Every claim below is verified against the code —
+      file references are clickable context for annotation. The big idea:
+      <b>humans emit the exact same typed ops the agent already uses</b>, so every object on the
+      canvas becomes controllable by either editor through one validated pipeline.
+    </div>
+    <div class="statline">
+      <div class="stat now up"><b>SHIPPED ✓</b> P1–P5 built &amp; verified</div>
+      <div class="stat"><b>1 op pipeline</b> human + agent</div>
+      <div class="stat"><b>5 decisions</b> locked 2026-07-12</div>
+      <div class="stat up"><b>2 videos</b> whats_new · product_tour</div>
+      <div class="stat up"><b>Drafting Ink</b> skill + AGENTS.md written</div>
+    </div>
+  </header>
+
+  <!-- ============ 1. FINDINGS ============ -->
+  <section>
+    <h2 class="sec"><span class="n">01</span> What I found stepping through the app <small>ran the live app, clicked everything — each row is verified in code</small></h2>
+    <p class="lede">
+      I drove the Library → Review flow, selected rooms and walls, and tried to click the island
+      bench. Clicking the bench selects the <em>kitchen room underneath it</em> — thin-line joinery
+      is paint, not an object. Door and window openings are the same story: painted gaps
+      (<code>OpeningGap</code>), not selectable objects — the capability matrix in §04 and phase P3
+      make both first-class. And once inside a review, the only way out is the 12px
+      “floor-plan studio” kicker link.
+    </p>
+    <div class="card">
+      <h3>Findings <small>P1 = blocks the product story · P2 = friction · P3 = polish</small></h3>
+      <div class="tbl-scroll"><table class="list">
+        <thead><tr><th>Sev</th><th>Finding</th><th>Evidence</th></tr></thead>
+        <tbody>
+          <tr><td><span class="sev p1">P1</span></td><td>No global navigation — three hash routes exist but nothing renders a nav; the only exit from Review is the tiny kicker link.</td><td><code>App.tsx:6-12</code>, <code>Review.tsx:111-113</code></td></tr>
+          <tr><td><span class="sev p1">P1</span></td><td>Humans cannot edit anything directly. The only mutation path is comments → LLM agent (<code>POST /comments</code> → agent <code>/apply</code>). Every canvas object is AI-controlled only.</td><td><code>main.py:165-182</code>, <code>api.ts:16-24</code></td></tr>
+          <tr><td><span class="sev p1">P1</span></td><td>Fixtures (thin-line cabinetry, benches, island) are render-only: no <code>id</code> in the schema, no hit layer, no labels drawn, clicks fall through to the room below. Verified live.</td><td><code>schema.py:107-112</code>, <code>PlanCanvas.tsx:179-190</code></td></tr>
+          <tr><td><span class="sev p2">P2</span></td><td>Ops vocabulary is already typed and complete for rooms/openings — a huge head start — but there is no <code>modify_fixture</code>, and <code>remove_fixture</code> targets a fragile array index.</td><td><code>ops.py:94-106</code></td></tr>
+          <tr><td><span class="sev p2">P2</span></td><td>Header is plain text; the interaction hint string is dumped into the subtitle. No brand presence, no visual anchor for “the key to product”.</td><td><code>Review.tsx:110-122</code></td></tr>
+          <tr><td><span class="sev p2">P2</span></td><td>Review loads the register of every version with serial awaited requests (N+1) before first paint.</td><td><code>Review.tsx:38-44</code></td></tr>
+          <tr><td><span class="sev p2">P2</span></td><td>The change-list queue is component state — a refresh mid-review silently loses queued comments.</td><td><code>Review.tsx:25</code></td></tr>
+          <tr><td><span class="sev p2">P2</span></td><td>Ingest shows the drafted geometry but never the uploaded image next to it, so you can’t visually verify the vision extraction.</td><td><code>Ingest.tsx:66-77</code></td></tr>
+          <tr><td><span class="sev p3">P3</span></td><td>Viewing an old version silently disables the canvas (<code>interactive=false</code>) with only a small footnote in the change list.</td><td><code>Review.tsx:159</code>, <code>ChangeList.tsx:107-111</code></td></tr>
+          <tr><td><span class="sev p3">P3</span></td><td>Multi-select via long-press + “MULTI-SELECT” text drawn inside the SVG is undiscoverable; Esc-to-clear is documented nowhere on screen.</td><td><code>PlanCanvas.tsx:106-121,352-356</code></td></tr>
+          <tr><td><span class="sev p3">P3</span></td><td>Version pills + mode tabs are crammed into the card header and wrap awkwardly at narrow widths.</td><td><code>Review.tsx:130-151</code></td></tr>
+          <tr><td><span class="sev p3">P3</span></td><td>Errors render as raw strings (<code>String(e)</code>) in the banner, including stack-ish HTTP bodies.</td><td><code>Review.tsx:55,63</code></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ============ 2. ARCHITECTURE ============ -->
+  <section>
+    <h2 class="sec"><span class="n">02</span> Target architecture — one op pipeline, two authors <small>how “everything a human or AI can control” actually works</small></h2>
+    <p class="lede">
+      The backend already has the perfect seam: <code>apply_ops()</code> in
+      <code>plan-core/ops.py</code> is “the ONLY way the agent may edit a plan” — typed, validated,
+      envelope-safe. The plan is <b>not</b> to build a second editing system. Direct human edits
+      compile to the <em>same op list</em> and enter through a new no-LLM endpoint. Same validator,
+      same wall re-derivation, same register diff, same version history — hunks just gain an
+      <code>author</code> field.
+    </p>
+    <div class="card"><div class="body">
+      <div class="mermaid">
+flowchart TB
+    subgraph human["HUMAN (new)"]
+      H1["Select object on canvas"] --> H2["Inspector: drag / resize /<br/>rename / edit dims"]
+      H2 --> H3["ops compiled in browser<br/>e.g. resize_room, modify_fixture"]
+    end
+    subgraph agent["AGENT (exists today)"]
+      A1["Queued comments"] --> A2["plan-agent /apply<br/>(DeepSeek/Claude loop)"]
+      A2 --> A3["ops emitted by LLM"]
+    end
+    H3 --> E1["POST /api/reviews/:id/edits<br/>(new, no LLM)"]
+    A3 --> E2["POST /api/reviews/:id/comments<br/>(existing)"]
+    E1 --> P["plan_core.apply_ops()<br/>+ validate() + envelope check"]
+    E2 --> P
+    P --> V["new Version n+1<br/>register hunk with author =<br/>'human' | 'agent'"]
+    V --> C["Canvas re-renders ·<br/>register shows author chip"]
+      </div>
+      <pre class="diffmock"><span class="h">@@ c09 · v05 · Island bench extended to 2.4m &nbsp;<span class="authchip chip ink">HUMAN</span></span><span class="del">- fixture  island bench      1.8 x 0.9m</span><span class="add">+ fixture  island bench      2.4 x 0.9m</span><span class="h">@@ c08 · v04 · Store → study + servery window &nbsp;<span class="authchip chip">AGENT</span></span><span class="del">- room     store             3.0 x 2.3m  utility</span><span class="add">+ room     study             3.0 x 2.3m  room</span></pre>
+      <div style="font-size:12.5px;color:var(--faint)">
+        The register stays git-style and cumulative; the author chip is the only visible addition.
+        Human edits skip the LLM entirely → sub-second round-trip instead of the 30–90s agent loop.
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ============ 3. SHELL MOCK ============ -->
+  <section>
+    <h2 class="sec"><span class="n">03</span> Proposed shell — left nav + compact header <small>mocked in the app’s own design system</small></h2>
+    <p class="lede">
+      Yes to the left sidebar. It solves navigation, gives address history a permanent home, and —
+      rendered in ink — becomes the strong visual anchor the product currently lacks. The current
+      three-line masthead collapses into a slim sticky <em>context bar</em>: address + config on the
+      left, the money story (baseline → proposed) on the right, version pills and mode tabs on a
+      sub-bar where they stop fighting the card header.
+    </p>
+
+    <div class="mockframe relwrap">
+      <div class="cmark" style="top:120px; left:6px;">1</div>
+      <div class="cmark" style="top:236px; left:6px;">2</div>
+      <div class="cmark" style="right:14px; top:56px;">3</div>
+      <div class="cmark" style="left:240px; top:104px;">4</div>
+      <div class="cmark" style="right:14px; top:104px;">5</div>
+      <div class="cmark" style="left:240px; top:150px;">6</div>
+      <div class="cmark" style="right:14px; top:190px;">7</div>
+      <div class="mockbar"><i></i><i></i><i></i><span class="url">localhost:5175/#/review/23f6…</span></div>
+      <div class="shell">
+        <nav class="snav">
+          <div class="brand">
+            <div class="b1">Floor-Plan<br/>Studio</div>
+            <div class="b2">geometry-first review</div>
+          </div>
+          <div class="group">Workspace</div>
+          <a class="item" href="#m"><span>Library</span><span class="k">L</span></a>
+          <a class="item" href="#m"><span>Upload plan</span><span class="k">U</span></a>
+          <div class="group">Recent reviews</div>
+          <a class="addr active" href="#m">
+            <span class="a1">231 Peats Ferry Rd, Hornsby</span>
+            <span class="a2"><span>5bd·3ba</span><span>v04</span><span class="up">+$390/wk</span></span>
+          </a>
+          <a class="addr" href="#m">
+            <span class="a1">12 Example St, Hornsby</span>
+            <span class="a2"><span>3bd·1ba</span><span>v02</span><span class="up">+$85/wk</span></span>
+          </a>
+          <a class="addr" href="#m">
+            <span class="a1">4/88 Pacific Hwy, Waitara</span>
+            <span class="a2"><span>2bd·2ba</span><span>needs ingest</span></span>
+          </a>
+          <div class="foot"><span class="dot"></span> agent idle · backend ok</div>
+        </nav>
+        <div class="smain">
+          <div class="ctxbar">
+            <span class="addr">231 Peats Ferry Rd — v04</span>
+            <span class="cfg">5 bed · 3 bath · 2 wc · 214 m²</span>
+            <span class="rent">$900/wk <span style="color:var(--faint)">→</span> <b>$1,290/wk</b> <span class="up">+$390</span></span>
+          </div>
+          <div class="subbar">
+            <span class="vpills"><span>v00</span><span>v01</span><span>v02</span><span>v03</span><span class="on">v04</span></span>
+            <span class="mtabs"><span class="on">Proposed</span><span>Delta</span></span>
+            <span class="acts"><span>⤓ PNG</span><span>⤓ SUMMARY.md</span><span>refresh comps</span></span>
+          </div>
+          <div class="canvasarea">
+            <div class="canvasbox">
+              <div class="cvtools">
+                <span class="on">Select</span><span>Move</span><span>Add fixture</span><span>Add opening</span>
+                <span class="ghost">Esc clears · shift multi-select</span>
+              </div>
+              <svg viewBox="0 0 380 240" style="border:1px solid var(--grey); display:block; width:100%">
+                <rect x="10" y="10" width="360" height="220" fill="#fff" stroke="#141416" stroke-width="6"/>
+                <line x1="150" y1="10" x2="150" y2="130" stroke="#141416" stroke-width="4"/>
+                <line x1="10" y1="130" x2="230" y2="130" stroke="#141416" stroke-width="4"/>
+                <line x1="230" y1="80" x2="230" y2="230" stroke="#141416" stroke-width="4"/>
+                <line x1="230" y1="80" x2="370" y2="80" stroke="#141416" stroke-width="4"/>
+                <text x="75" y="65" font-size="11" font-weight="700" text-anchor="middle" fill="#141416">BED 5</text>
+                <text x="75" y="78" font-size="8.5" text-anchor="middle" fill="#74747a">4.0 x 4.3m</text>
+                <text x="190" y="60" font-size="11" font-weight="700" text-anchor="middle" fill="#141416">KITCHEN</text>
+                <text x="190" y="72" font-size="8.5" text-anchor="middle" fill="#74747a">6.5 x 2.8m</text>
+                <text x="300" y="40" font-size="11" font-weight="700" text-anchor="middle" fill="#141416">LIVING</text>
+                <text x="300" y="52" font-size="8.5" text-anchor="middle" fill="#74747a">7.5 x 2.9m</text>
+                <text x="120" y="185" font-size="11" font-weight="700" text-anchor="middle" fill="#141416">BED 1</text>
+                <text x="120" y="197" font-size="8.5" text-anchor="middle" fill="#74747a">2.9 x 3.1m</text>
+                <text x="300" y="160" font-size="11" font-weight="700" text-anchor="middle" fill="#141416">BED 2</text>
+                <text x="300" y="172" font-size="8.5" text-anchor="middle" fill="#74747a">3.5 x 3.7m</text>
+                <!-- selected fixture: island bench -->
+                <rect x="168" y="90" width="52" height="18" fill="none" stroke="#141416" stroke-width="2"/>
+                <rect x="164" y="86" width="60" height="26" fill="rgba(226,61,40,0.08)" stroke="#e23d28" stroke-width="2.5" stroke-dasharray="6 4"/>
+                <circle cx="164" cy="86" r="4" fill="#fff" stroke="#e23d28" stroke-width="2.5"/>
+                <circle cx="224" cy="112" r="4" fill="#fff" stroke="#e23d28" stroke-width="2.5"/>
+                <text x="194" y="82" font-size="8" font-weight="700" text-anchor="middle" fill="#e23d28">ISLAND BENCH</text>
+              </svg>
+            </div>
+            <div class="inspector">
+              <h4>Inspector</h4>
+              <div class="what">Island bench <span class="chip">fixture</span> <span class="chip dim">fx:island-bench</span></div>
+              <div class="frow one"><div class="f"><label>Label</label><div class="v">Island bench</div></div></div>
+              <div class="frow">
+                <div class="f"><label>x (m)</label><div class="v">6.30</div></div>
+                <div class="f"><label>y (m)</label><div class="v">3.65</div></div>
+              </div>
+              <div class="frow">
+                <div class="f"><label>w (m)</label><div class="v">1.80</div></div>
+                <div class="f"><label>h (m)</label><div class="v">0.90</div></div>
+              </div>
+              <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
+                <span class="btn">Apply edit</span>
+                <span class="btn alt">Ask agent…</span>
+              </div>
+              <div style="font-size:11.5px; color:var(--faint); margin-top:10px">
+                Apply = instant, validated, no LLM. Ask agent = current comment flow, pre-targeted
+                at this object.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ol class="callouts">
+      <li><span class="cnum">1</span><span><b>Workspace nav.</b> Library and Upload are one click from anywhere — fixes “once in review I can’t get out”. Keyboard shortcuts L / U.</span></li>
+      <li><span class="cnum">2</span><span><b>Address history.</b> Every review the backend knows about (<code>GET /api/plans</code> already returns this), with config, head version and rent uplift. The current review is marked. This is the sidebar’s reason to exist — the product is “walk properties, raise rent”.</span></li>
+      <li><span class="cnum">3</span><span><b>The money story lives in the header.</b> Baseline → proposed → uplift is the product’s one-line pitch; it’s permanently visible, top-right, in every review. Positive change is always <span style="color:var(--green);font-weight:700">green</span>, negative always <span style="color:var(--red);font-weight:700">red</span> — here, in the sidebar history, and in register hunk impacts.</span></li>
+      <li><span class="cnum">4</span><span><b>Version pills + mode tabs move to a sub-bar</b> out of the canvas card header, so the canvas card disappears entirely — the plan IS the page.</span></li>
+      <li><span class="cnum">5</span><span><b>Exports & comps refresh</b> become quiet utility links in the sub-bar instead of scattered hints.</span></li>
+      <li><span class="cnum">6</span><span><b>Canvas toolbar</b> makes the invisible discoverable: Select / Move / Add fixture / Add opening modes, with the multi-select and Esc hints inline instead of painted inside the SVG.</span></li>
+      <li><span class="cnum">7</span><span><b>Inspector panel</b> — the heart of human editing. Selected object shows editable name + metric dims (exactly the values the renderer draws), Apply for direct ops, or hand the same selection to the agent.</span></li>
+    </ol>
+    <div style="font-size:12.5px;color:var(--faint)">
+      Agent status (footer of sidebar) replaces the banner for the idle case; job-running still gets
+      the amber banner plus a progress row under the context bar. The sidebar collapses to a hamburger
+      drawer below 760px.
+    </div>
+  </section>
+
+  <!-- ============ 4. CAPABILITY MATRIX ============ -->
+  <section>
+    <h2 class="sec"><span class="n">04</span> Every object, both editors <small>current vs target capability per canvas object</small></h2>
+    <p class="lede">
+      “A user can change every object on the plan canvas” translates to this matrix. Ops marked
+      <span class="chip ok">exists</span> already work in <code>plan-core</code> and only need UI;
+      <span class="chip amber">new op</span> means a small, additive change to <code>ops.py</code>.
+      Below, every object type drawn exactly as the canvas renders it — as-drawn on the left,
+      selected on the right.
+    </p>
+
+    <div class="objgallery">
+      <!-- ROOM -->
+      <div class="obj">
+        <h4><span>Room</span><span class="chip ink">thick walls</span></h4>
+        <svg viewBox="0 0 240 120">
+          <text x="62" y="14" font-size="7" letter-spacing="2" text-anchor="middle" fill="#74747a">AS DRAWN</text>
+          <text x="178" y="14" font-size="7" letter-spacing="2" text-anchor="middle" fill="#74747a">SELECTED</text>
+          <rect x="20" y="24" width="84" height="76" fill="#fff" stroke="#141416" stroke-width="5"/>
+          <text x="62" y="58" font-size="10" font-weight="700" text-anchor="middle" fill="#141416">BED 3</text>
+          <text x="62" y="70" font-size="8" text-anchor="middle" fill="#74747a" font-family="ui-monospace,monospace">3.1 x 3.1m</text>
+          <rect x="136" y="24" width="84" height="76" fill="#fff" stroke="#141416" stroke-width="5"/>
+          <rect x="136" y="24" width="84" height="76" fill="rgba(226,61,40,0.08)" stroke="#e23d28" stroke-width="3" stroke-dasharray="7 4"/>
+          <text x="178" y="58" font-size="10" font-weight="700" text-anchor="middle" fill="#141416">BED 3</text>
+          <text x="178" y="70" font-size="8" text-anchor="middle" fill="#74747a" font-family="ui-monospace,monospace">3.1 x 3.1m</text>
+        </svg>
+        <div class="cap">Click to select · P3: drag body to move, corner handles to resize (0.05m snap) · inspector: rename, kind, exact dims · dims label always visible.</div>
+      </div>
+
+      <!-- WALL + CHUNK -->
+      <div class="obj">
+        <h4><span>Wall &amp; chunk</span><span class="chip ink">derived</span></h4>
+        <svg viewBox="0 0 240 120">
+          <text x="120" y="14" font-size="7" letter-spacing="2" text-anchor="middle" fill="#74747a">AS DRAWN</text>
+          <rect x="20" y="30" width="200" height="11" fill="#141416"/>
+          <text x="120" y="62" font-size="7" letter-spacing="1.5" text-anchor="middle" fill="#74747a">SELECTED — CHUNK PICKED</text>
+          <rect x="20" y="78" width="200" height="11" fill="#141416"/>
+          <line x1="75" y1="83.5" x2="160" y2="83.5" stroke="#e23d28" stroke-width="9" stroke-linecap="round" opacity="0.85"/>
+          <circle cx="75" cy="83.5" r="6.5" fill="#fff" stroke="#e23d28" stroke-width="3"/>
+          <circle cx="160" cy="83.5" r="6.5" fill="#fff" stroke="#e23d28" stroke-width="3"/>
+          <text x="117" y="70" font-size="9" font-weight="700" text-anchor="middle" fill="#e23d28" font-family="ui-monospace,monospace">1.4m chunk</text>
+        </svg>
+        <div class="cap">Click selects the whole wall; drag the handles to pick a chunk (works today). Walls re-derive from rooms — you move rooms, never walls. “Open chunk” removes the picked span.</div>
+      </div>
+
+      <!-- OPENINGS -->
+      <div class="obj">
+        <h4><span>Opening</span><span class="chip amber">new UI in P3</span></h4>
+        <svg viewBox="0 0 240 120">
+          <text x="120" y="14" font-size="7" letter-spacing="1.5" text-anchor="middle" fill="#74747a">THREE TYPES, ONE WALL</text>
+          <rect x="14" y="45" width="212" height="11" fill="#141416"/>
+          <rect x="34" y="43" width="26" height="15" fill="#fff"/>
+          <rect x="98" y="43" width="30" height="15" fill="#fff"/>
+          <line x1="98" y1="45" x2="128" y2="45" stroke="#141416" stroke-width="2"/>
+          <line x1="98" y1="56" x2="128" y2="56" stroke="#141416" stroke-width="2"/>
+          <rect x="166" y="43" width="40" height="15" fill="#fff"/>
+          <text x="47" y="75" font-size="8.5" text-anchor="middle" fill="#74747a">door</text>
+          <text x="113" y="75" font-size="8.5" text-anchor="middle" fill="#74747a">window</text>
+          <text x="186" y="75" font-size="8.5" text-anchor="middle" fill="#74747a">open</text>
+          <circle cx="34" cy="50.5" r="5" fill="#fff" stroke="#e23d28" stroke-width="2.5"/>
+          <circle cx="60" cy="50.5" r="5" fill="#fff" stroke="#e23d28" stroke-width="2.5"/>
+          <text x="60" y="97" font-size="7.5" font-weight="700" text-anchor="middle" fill="#e23d28">drag ends</text>
+        </svg>
+        <div class="cap">Doors render as clean gaps, windows keep their sill lines, “open” is a removed chunk. P3: click a gap to select, drag its ends (t0/t1), toggle door/window/open, delete — ops all exist today.</div>
+      </div>
+
+      <!-- FIXTURE -->
+      <div class="obj">
+        <h4><span>Fixture</span><span class="chip amber">first-class in P4</span></h4>
+        <svg viewBox="0 0 240 120">
+          <text x="57" y="14" font-size="7" letter-spacing="2" text-anchor="middle" fill="#74747a">AS DRAWN</text>
+          <text x="178" y="14" font-size="7" letter-spacing="2" text-anchor="middle" fill="#74747a">SELECTED</text>
+          <rect x="22" y="42" width="70" height="24" fill="none" stroke="#141416" stroke-width="2"/>
+          <text x="58" y="80" font-size="7.5" text-anchor="middle" fill="#74747a">BENCH · 1.8 x 0.6m</text>
+          <rect x="140" y="40" width="76" height="28" fill="none" stroke="#141416" stroke-width="2"/>
+          <rect x="135" y="35" width="86" height="38" fill="rgba(226,61,40,0.08)" stroke="#e23d28" stroke-width="2.5" stroke-dasharray="6 4"/>
+          <circle cx="135" cy="35" r="4.5" fill="#fff" stroke="#e23d28" stroke-width="2.5"/>
+          <circle cx="221" cy="73" r="4.5" fill="#fff" stroke="#e23d28" stroke-width="2.5"/>
+          <text x="178" y="30" font-size="8" font-weight="700" text-anchor="middle" fill="#e23d28">ISLAND BENCH</text>
+          <text x="178" y="86" font-size="8" text-anchor="middle" fill="#74747a">fx:island-bench · 1.8 x 0.9m</text>
+        </svg>
+        <div class="cap">Cabinetry, benches, robes — today pure paint (clicks fall through to the room). P4: stable ids, hover label, click to select, drag/resize handles, rename + dims in the inspector, draw-a-rectangle to add.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tbl-scroll"><table class="list">
+        <thead><tr><th>Object</th><th>Today</th><th>Select</th><th>Add</th><th>Move / resize</th><th>Rename / dims</th><th>Delete</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>Room</b> (thick walls)</td>
+            <td>AI only, via comments</td>
+            <td><span class="chip ok">exists</span> click</td>
+            <td><span class="chip ok">exists</span> <code>split_room</code></td>
+            <td><span class="chip ok">exists</span> <code>resize_room</code> — UI: drag body / corner handles, snap 0.05m</td>
+            <td><span class="chip ok">exists</span> <code>rename</code>, <code>set_kind</code> — UI: inspector + double-click label</td>
+            <td><span class="chip ok">exists</span> <code>remove_room</code>, <code>merge_rooms</code></td>
+          </tr>
+          <tr>
+            <td><b>Wall chunk</b></td>
+            <td>Select + drag handles (already good)</td>
+            <td><span class="chip ok">exists</span></td>
+            <td><span class="chip dim">n/a</span> derived from rooms</td>
+            <td><span class="chip dim">n/a</span> walls re-derive automatically</td>
+            <td><span class="chip dim">n/a</span></td>
+            <td><span class="chip ok">exists</span> <code>remove_wall_chunk</code> → “Open this chunk” button in inspector</td>
+          </tr>
+          <tr>
+            <td><b>Opening</b> (door / window)</td>
+            <td>Invisible to selection — only paint</td>
+            <td><span class="chip amber">new UI</span> hit-rect per opening</td>
+            <td><span class="chip ok">exists</span> <code>add_opening</code> — UI: “Add opening” mode, click a wall</td>
+            <td><span class="chip ok">exists</span> <code>modify_opening</code> — UI: drag t0/t1 handles like wall chunks</td>
+            <td><span class="chip ok">exists</span> type toggle door/window/open</td>
+            <td><span class="chip ok">exists</span> <code>remove_opening</code></td>
+          </tr>
+          <tr>
+            <td><b>Fixture</b> (thin-line cabinetry, benches, robes)</td>
+            <td>Paint only — click falls through to room</td>
+            <td><span class="chip amber">new UI</span> hit-rect + hover label</td>
+            <td><span class="chip ok">exists</span> <code>add_fixture</code> — UI: draw rectangle in “Add fixture” mode</td>
+            <td><span class="chip amber">new op</span> <code>modify_fixture</code> (id, x, y, w, h) — UI: drag + handles</td>
+            <td><span class="chip amber">new op</span> label via <code>modify_fixture</code>; label rendered on canvas when it fits</td>
+            <td><span class="chip amber">new op</span> <code>remove_fixture</code> by <b>id</b> (today: array index)</td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>
+    <p class="lede" style="font-size:13px">
+      Prerequisite for the fixture column: give <code>Fixture</code> an <code>id</code>
+      (<code>schema.py:107</code>) — generated <code>fx:slug(label)-n</code> at ingest/creation, and a
+      one-time backfill when old geometry JSON is loaded (fixtures without ids get them assigned on
+      read; version payloads are re-serialized on write, so no DB migration script is needed).
+      Comment targets then accept <code>type: "fixture"</code> alongside room/wall
+      (<code>main.py:148-152</code>, <code>types.ts:133-142</code>) so the agent can be pointed at a
+      bench just like a wall.
+    </p>
+  </section>
+
+  <!-- ============ 5. API & CODE CHANGES ============ -->
+  <section>
+    <h2 class="sec"><span class="n">05</span> Concrete code changes <small>small, additive — no rewrite anywhere</small></h2>
+    <div class="card">
+      <h3>plan-core — fixture identity + modify op <small>packages/plan-core/src/plan_core</small></h3>
+      <div class="body">
+        <div id="diff-schema"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>backend-api — the human edit endpoint <small>services/backend-api/src/backend_api/main.py (new route, mirrors _run_job without the agent call)</small></h3>
+      <div class="body">
+        <div id="file-endpoint"></div>
+        <div style="font-size:12.5px;color:var(--faint);margin-top:8px">
+          Reuses everything <code>_run_job</code> does after the agent returns: envelope pin,
+          <code>validate()</code>, register hunk from <code>diff_geometries()</code>, rent carry-over,
+          SSE <code>version.ready</code>. Rejects with 409 while an agent job is running (single-writer
+          rule), and with 409 on stale <code>version_n</code> exactly like comments.
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>frontend — new modules <small>app/frontend/src</small></h3>
+      <div class="body">
+        <div class="tbl-scroll"><table class="list">
+          <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>components/Sidebar.tsx</code> <span class="chip ok">new</span></td><td>Ink sidebar: workspace nav, recent reviews from <code>GET /api/plans</code>, agent status footer. Rendered by <code>App.tsx</code> around all routes.</td></tr>
+            <tr><td><code>components/ContextBar.tsx</code> <span class="chip ok">new</span></td><td>Slim sticky header: address, config, rent story; sub-bar with version pills, mode tabs, export links. Replaces <code>header.site</code> + <code>StatsBar</code> on Review.</td></tr>
+            <tr><td><code>components/Inspector.tsx</code> <span class="chip ok">new</span></td><td>Selected-object editor: name/label, kind, x/y/w/h in metres, per-type actions (open chunk, opening type). Compiles field edits + drags into an op list; Apply → <code>api.applyEdits()</code>, Ask agent → prefilled comment.</td></tr>
+            <tr><td><code>editing.ts</code> <span class="chip ok">new</span></td><td>Pure functions: <code>Selection + drag/field intent → Op[]</code>, optimistic geometry preview via a TS port of the tiny apply subset (or re-fetch on 202 — decision Q1 below).</td></tr>
+            <tr><td><code>PlanCanvas.tsx</code> <span class="chip amber">extend</span></td><td>Fixture + opening hit layers, drag-to-move rooms/fixtures with d3-drag (already imported for wall handles), resize handles, “add fixture” draw mode, toolbar mode state.</td></tr>
+            <tr><td><code>api.ts</code> <span class="chip amber">extend</span></td><td><code>applyEdits(reviewId, versionN, ops)</code>; <code>plans()</code> reused by sidebar; batch register endpoint (P5).</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6. PHASES ============ -->
+  <section>
+    <h2 class="sec"><span class="n">06</span> Delivery phases — all shipped ✓ <small>plan-core 11 tests green · ruff · mypy · frontend tsc/build · make smoke · verified live in the browser</small></h2>
+    <div class="risk" style="border-left-color:var(--green);background:var(--green-bg)">
+      <b style="color:var(--green)">Built &amp; verified 2026-07-12</b>
+      All five phases landed. Live proof: a human rename store→STUDY applied in &lt;1s as a HUMAN-authored
+      v04 hunk (flagged “rent not re-assessed”); a DeepSeek agent round-trip added a servery window +
+      island bench as an AGENT v05; the register interleaves both authors with ink/red chips. Two
+      narrated videos recorded (whats_new 85s, product_tour 108s) with burned captions + SRT.
+      <div class="mit"></div>
+    </div>
+
+    <div class="phase">
+      <div class="pn"><b>P1</b><span>nav shell</span></div>
+      <div class="pb">
+        <h4>Sidebar + context bar — you can always get out</h4>
+        <ul>
+          <li><code>Sidebar.tsx</code> with Library / Upload / recent reviews (address, config, head, uplift) + active state from the hash route.</li>
+          <li><code>ContextBar.tsx</code> on Review; Library/Ingest get the same shell with simpler headers.</li>
+          <li>Route fallback: unknown hash → Library with a “review not found” banner instead of silent redirect.</li>
+          <li>Responsive: sidebar → drawer under 760px.</li>
+        </ul>
+        <div class="accept"><b>Accept:</b> from any page, ≤1 click to Library, Upload, or any recent review; rent story visible without scrolling at 1280×800.</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="pn"><b>P2</b><span>human ops</span></div>
+      <div class="pb">
+        <h4>The /edits pipeline — humans mutate geometry without the LLM</h4>
+        <ul>
+          <li><code>POST /api/reviews/{id}/edits</code> (ops + version_n) → apply_ops → validate → version, author=<code>human</code>; 409 on stale head or running agent job.</li>
+          <li><code>author</code> on register hunks (default <code>agent</code> for history), author chip in <code>Register.tsx</code>.</li>
+          <li>Inspector v1: rename, kind, numeric x/y/w/h for the selected <b>room</b>; “open this wall chunk” button for a selected chunk; Apply + Ask-agent buttons.</li>
+        </ul>
+        <div class="accept"><b>Accept:</b> rename a room and resize it by typing dims; new version appears in &lt;1s with a HUMAN hunk; agent flow untouched.</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="pn"><b>P3</b><span>direct edit</span></div>
+      <div class="pb">
+        <h4>Drag it like a plan editor</h4>
+        <ul>
+          <li>Drag room body to move, corner handles to resize (d3-drag, 0.05m snap, live dim label — same pattern as the existing wall-chunk handles).</li>
+          <li>Opening hit-rects: select, drag ends (<code>modify_opening</code>), type toggle, delete; “Add opening” toolbar mode.</li>
+          <li>Local preview before Apply: pending ops render as an amber “uncommitted” overlay; Esc discards.</li>
+          <li>Dimension labels always visible on every room — remove the <code>showDims</code> auto-hide threshold (<code>PlanCanvas.tsx:421</code>); tiny rooms shrink the dim label to a legible floor instead of dropping it.</li>
+        </ul>
+        <div class="accept"><b>Accept:</b> move/resize a bedroom and add a door entirely by mouse; validator rejection (e.g. envelope breach) shows inline and geometry snaps back; every room shows its dims at all zoom levels.</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="pn"><b>P4</b><span>fixtures</span></div>
+      <div class="pb">
+        <h4>Thin-line objects become first-class</h4>
+        <ul>
+          <li><code>Fixture.id</code> + <code>modify_fixture</code> + id-based <code>remove_fixture</code> in plan-core; id backfill on read; unit tests.</li>
+          <li>Canvas: fixture hit layer, hover label, selection, drag/resize handles, “Add fixture” draw-a-rectangle mode; label rendered when it fits.</li>
+          <li>Inspector supports fixtures (label + dims); comment targets accept <code>fixture</code> so the agent can be aimed at benches/cabinetry too.</li>
+        </ul>
+        <div class="accept"><b>Accept:</b> click the island bench and it selects the bench, not the kitchen; stretch it, rename it, or ask the agent to move it — all three land as versions.</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="pn"><b>P5</b><span>polish</span></div>
+      <div class="pb">
+        <h4>Perf + friction round-up</h4>
+        <ul>
+          <li>Batch endpoint <code>GET /api/reviews/{id}/registers</code> kills the N+1 version loop.</li>
+          <li>Comment queue persisted to <code>localStorage</code> per review; restored on reload.</li>
+          <li>Ingest: uploaded image side-by-side with drafted geometry; visual diff is the point of that page.</li>
+          <li>Old-version state made explicit: “read-only — viewing v02 of v04” pill in the context bar with a “jump to head” action.</li>
+          <li>Friendly error banners (status + short message), toasts for version.ready.</li>
+        </ul>
+        <div class="accept"><b>Accept:</b> review with 10 versions paints in one round-trip per view; refresh mid-queue loses nothing.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 7. RISKS ============ -->
+  <section>
+    <h2 class="sec"><span class="n">07</span> Risks & failure modes</h2>
+    <div class="risk"><b>Version explosion from micro-edits</b>
+      Ten drags = ten versions would trash the register’s narrative. Mitigation (decided, Q1): pending-ops preview batches everything until one Apply; one Apply = one version = one hunk.
+      <div class="mit"></div></div>
+    <div class="risk"><b>Rent integrity</b>
+      Agent changes carry a rent estimate; human edits don’t. If a human deletes a bedroom, proposed rent is silently wrong. Mitigation (decided, Q2): zero-impact hunk flagged “rent not re-assessed”, with a one-click “re-estimate” that asks the agent.
+      <div class="mit"></div></div>
+    <div class="risk"><b>Concurrent writers</b>
+      A human Apply while an agent job runs would fork the head. Mitigation: single-writer lock — /edits 409s while a job is queued/running (the UI already tracks <code>busy</code>), and the existing stale-head 409 covers the reverse case.
+      <div class="mit"></div></div>
+    <div class="risk"><b>Fixture id backfill</b>
+      Old versions store fixtures without ids. Assign deterministic ids on read (<code>fx:label-slug-i</code> by array order) so diffs between old and new versions stay stable; never mutate stored v≤head JSON in place.
+      <div class="mit"></div></div>
+    <div class="risk"><b>Scope note — walls stay derived</b>
+      Humans move rooms, not walls: <code>derive_walls()</code> stays the single source of wall truth, which is what keeps the envelope invariant enforceable. The UI should say this (“walls follow rooms”) rather than let users try to drag a wall sideways and wonder why they can’t.
+      <div class="mit"></div></div>
+  </section>
+
+  <!-- ============ 8. STYLE GUIDE ============ -->
+  <section>
+    <h2 class="sec"><span class="n">08</span> Style guide — decided: A · Drafting Ink <small>skill + AGENTS.md section written 2026-07-12; B and C kept below for the record</small></h2>
+    <p class="lede">
+      <b>Option A (Drafting Ink) is locked</b> and already enforced on three surfaces:
+      <b>(1)</b> design tokens stay in <code>frontend/src/styles.css</code> as the single source,
+      <b>(2)</b> the skill <code>.claude/skills/frontend-style/SKILL.md</code> now exists — tokens,
+      type scale, component recipes, canvas rules, do/don’ts — loaded before any
+      <code>app/frontend</code> work, and
+      <b>(3)</b> AGENTS.md gained a “Frontend style guide” section with the invariant list pointing
+      at the skill. Canvas semantics (ink walls, red selection, green/red/amber delta) are locked
+      regardless of chrome.
+    </p>
+
+    <div class="styleopts">
+      <!-- Option A -->
+      <div class="sopt">
+        <div class="sopt-tag" style="color:var(--green)">Option A ✓ CHOSEN</div>
+        <div class="sg sg-a">
+          <div class="sg-head">
+            <span class="sg-brand">Floor-Plan Studio</span>
+            <span class="sg-stat">$900 → <b>$1,290</b> <em>+$390/wk</em></span>
+          </div>
+          <div class="sg-body">
+            <div class="sg-h1">231 Peats Ferry Rd — v04</div>
+            <div class="sg-sub">5 bed · 3 bath · 2 wc · 214 m²</div>
+            <div class="sg-row">
+              <span class="sg-btn">Apply edit</span>
+              <span class="sg-btn ghost">Ask agent</span>
+              <span class="sg-chip">fixture</span>
+            </div>
+            <div class="sg-plan"><span></span></div>
+          </div>
+        </div>
+        <h4>Drafting Ink — evolve what exists</h4>
+        <p>The current brutalist ink/paper/red, tightened: architectural-drafting feel, Helvetica
+        Neue, uppercase letter-spaced labels, hard 3px rules, mono for every number. The plan’s
+        black linework IS the brand; UI chrome stays monochrome so the red means “selected /
+        money”.</p>
+        <ul>
+          <li>Tokens: ink <code>#141416</code> · paper <code>#fff</code> · signal red <code>#e23d28</code> · grey scale · mono numerals</li>
+          <li>Rules: no shadows, no rounded corners; one accent per view; canvas always on white</li>
+          <li>Cost: near-zero migration — refines <code>styles.css</code> in place</li>
+        </ul>
+      </div>
+
+      <!-- Option B -->
+      <div class="sopt">
+        <div class="sopt-tag" style="color:var(--faint)">Option B — not selected</div>
+        <div class="sg sg-b">
+          <div class="sg-head">
+            <span class="sg-brand">Floor-Plan Studio</span>
+            <span class="sg-stat">$900 → <b>$1,290</b> <em>+$390/wk</em></span>
+          </div>
+          <div class="sg-body">
+            <div class="sg-h1">231 Peats Ferry Rd — v04</div>
+            <div class="sg-sub">5 bed · 3 bath · 2 wc · 214 m²</div>
+            <div class="sg-row">
+              <span class="sg-btn">Apply edit</span>
+              <span class="sg-btn ghost">Ask agent</span>
+              <span class="sg-chip">fixture</span>
+            </div>
+            <div class="sg-plan"><span></span></div>
+          </div>
+        </div>
+        <h4>Blueprint — dark technical</h4>
+        <p>CAD-room aesthetic: deep blueprint navy chrome, fine 1px line-work, cyan selection,
+        amber warnings, mono-forward type. The white plan canvas floats like a lit drawing board —
+        maximum contrast between chrome and drawing.</p>
+        <ul>
+          <li>Tokens: navy <code>#0e1c2e</code> / surface <code>#142a44</code> · line <code>#dce8f5</code> · cyan <code>#4cc3ff</code> · amber <code>#ffb347</code></li>
+          <li>Rules: chrome is dark, the drawing is always paper-white; grid texture allowed on empty states</li>
+          <li>Cost: medium — full token swap + dark-mode audit of every component</li>
+        </ul>
+      </div>
+
+      <!-- Option C -->
+      <div class="sopt">
+        <div class="sopt-tag" style="color:var(--faint)">Option C — not selected</div>
+        <div class="sg sg-c">
+          <div class="sg-head">
+            <span class="sg-brand">Floor-Plan Studio</span>
+            <span class="sg-stat">$900 → <b>$1,290</b> <em>+$390/wk</em></span>
+          </div>
+          <div class="sg-body">
+            <div class="sg-h1">231 Peats Ferry Rd — v04</div>
+            <div class="sg-sub">5 bed · 3 bath · 2 wc · 214 m²</div>
+            <div class="sg-row">
+              <span class="sg-btn">Apply edit</span>
+              <span class="sg-btn ghost">Ask agent</span>
+              <span class="sg-chip">fixture</span>
+            </div>
+            <div class="sg-plan"><span></span></div>
+          </div>
+        </div>
+        <h4>Editorial Estate — premium listing</h4>
+        <p>Property-magazine warmth: warm paper, serif display headings in sentence case, deep
+        estate green + brass accents, hairline borders, soft card shadows. Sells the rent-uplift
+        story to landlords rather than to engineers.</p>
+        <ul>
+          <li>Tokens: paper <code>#faf8f4</code> · ink <code>#1f1d1a</code> · estate green <code>#2e5d4b</code> · brass <code>#b08d3e</code> · serif display</li>
+          <li>Rules: serif for headings only; numbers stay mono; green = money, brass = actions</li>
+          <li>Cost: medium-high — new type system + re-tuning the red/green diff semantics</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>What the skill file contains <small>written to .claude/skills/frontend-style/SKILL.md</small></h3>
+      <div class="body">
+        <pre class="diffmock"><span class="h"># .claude/skills/frontend-style/SKILL.md</span>
+---
+name: frontend-style
+description: Floor-Plan Studio design system — load before touching app/frontend
+---
+## Tokens        → the option’s CSS variables (single source: styles.css)
+## Type scale    → families, sizes, casing, letter-spacing per level
+## Components    → button / chip / card / banner / table / inspector recipes
+## Canvas rules  → plan linework, selection, delta colours are LOCKED (ink/red/green/amber)
+## Do / don’t    → e.g. “no new colours without a token”, “numbers always mono”
+</pre>
+        <div style="font-size:12.5px;color:var(--faint)">
+          Done: AGENTS.md now has the “Frontend style guide” section (invariant list + pointer to the
+          skill) between “Repo conventions” and “Roadmap”, so this agent and every future session
+          apply Drafting Ink automatically when touching <code>app/frontend</code>.
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ============ 9. DECISIONS ============ -->
+  <section>
+    <h2 class="sec"><span class="n">09</span> Decisions — locked 2026-07-12 <small>all five answered via this review; the plan above reflects them</small></h2>
+    <div class="card">
+      <h3>Decision record</h3>
+      <div class="tbl-scroll"><table class="list">
+        <thead><tr><th></th><th>Question</th><th>Decision</th><th>Consequence in the plan</th></tr></thead>
+        <tbody>
+          <tr><td><b>Q1</b></td><td>When does a human edit become a version?</td><td><b>Batch</b> — pending ops accumulate locally; one Apply commits one version</td><td>P3 builds the amber “uncommitted” preview; Esc discards; one Apply = one register hunk.</td></tr>
+          <tr><td><b>Q2</b></td><td>Rent after a human edit</td><td><b>Flag + optional re-estimate</b> — $0 impact, amber “rent not re-assessed” flag, one-click agent re-price</td><td>P2 endpoint stamps the flag; the re-estimate button reuses the comps/agent flow.</td></tr>
+          <tr><td><b>Q3</b></td><td>Sidebar contents</td><td><b>Recent reviews + Upload + agent status footer</b> (no comps panel, no exports section)</td><td>Sidebar mock in §03 is final; comps stay on the review page, exports stay in the sub-bar.</td></tr>
+          <tr><td><b>Q4</b></td><td>Build order</td><td><b>As planned</b> — P1 nav shell → P2 human ops → P3 direct edit → P4 fixtures → P5 polish</td><td>Phases in §06 execute top-to-bottom.</td></tr>
+          <tr><td><b>Q5</b></td><td>Style guide</td><td><b>A · Drafting Ink</b></td><td>Skill written to <code>.claude/skills/frontend-style/SKILL.md</code>; “Frontend style guide” section added to AGENTS.md. Done.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <footer>
+    Floor-Plan Studio improvement plan · design system: the app’s own (styles.css ink/paper/red) ·
+    annotate any element or queue the decisions above, then press <b>Send to Agent</b>.
+  </footer>
+</div>
+
+<!-- code rendering: @pierre/diffs -->
+<script type="module">
+  import { File, FileDiff } from "https://esm.sh/@pierre/diffs@1.2.10?bundle";
+  const theme = { light: "github-light", dark: "github-dark" };
+  const options = { theme, themeType: "light", overflow: "wrap" };
+
+  const oldSchema = {
+    name: "packages/plan-core/src/plan_core/schema.py + ops.py",
+    contents: `class Fixture(BaseModel):
+    x: float
+    y: float
+    w: float
+    h: float
+    label: str = ""
+
+
+# ops.py — fixture ops today
+class AddFixture(BaseModel):
+    op: Literal["add_fixture"]
+    x: float; y: float; w: float; h: float
+    label: str = ""
+
+class RemoveFixture(BaseModel):
+    op: Literal["remove_fixture"]
+    index: int   # fragile: array position
+`,
+  };
+  const newSchema = {
+    name: "packages/plan-core/src/plan_core/schema.py + ops.py",
+    contents: `class Fixture(BaseModel):
+    id: str = ""          # fx:island-bench-1 · backfilled on read
+    x: float
+    y: float
+    w: float
+    h: float
+    label: str = ""
+
+
+# ops.py — fixture ops target
+class AddFixture(BaseModel):
+    op: Literal["add_fixture"]
+    x: float; y: float; w: float; h: float
+    label: str = ""
+
+class ModifyFixture(BaseModel):
+    op: Literal["modify_fixture"]
+    fixture_id: str
+    x: float | None = None
+    y: float | None = None
+    w: float | None = None
+    h: float | None = None
+    label: str | None = None
+
+class RemoveFixture(BaseModel):
+    op: Literal["remove_fixture"]
+    fixture_id: str   # stable id, not index
+`,
+  };
+
+  new FileDiff({ ...options, diffStyle: "split" }).render({
+    containerWrapper: document.querySelector("#diff-schema"),
+    oldFile: oldSchema,
+    newFile: newSchema,
+  });
+
+  new File(options).render({
+    containerWrapper: document.querySelector("#file-endpoint"),
+    file: {
+      name: "services/backend-api/src/backend_api/main.py (new)",
+      contents: `class EditBatch(BaseModel):
+    version_n: int
+    ops: list[dict[str, Any]]          # parsed via plan_core.parse_ops
+
+
+@app.post("/api/reviews/{review_id}/edits", status_code=201)
+def apply_edits(review_id: str, batch: EditBatch) -> dict[str, Any]:
+    """Direct human edits: same pipeline as the agent, minus the LLM."""
+    with session() as db:
+        head = _versions(db, review_id)[-1]
+        if head.n != batch.version_n:
+            raise HTTPException(409, f"stale: head is v{head.n}")
+        if _job_running(db, review_id):
+            raise HTTPException(409, "agent job in progress")
+
+        ops = parse_ops(batch.ops)                    # typed validation
+        result = apply_ops(_geo(head), ops)           # same as agent path
+        result.geometry.meta["envelope"] = ...        # pin from v0
+        errors, warnings = validate(result.geometry)
+        if errors:
+            raise HTTPException(422, "; ".join(errors[:5]))
+
+        hunk = register_hunk(change, diff_geometries(_geo(head), result.geometry))
+        # Change(author="human", rent_impact_per_week=0, flags=["rent not re-assessed"])
+        ...create Version(n=head.n + 1) · publish version.ready...
+    return {"n": head.n + 1, "warnings": warnings}
+`,
+    },
+  });
+</script>
+
+<!-- mermaid: theme-aware render -->
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "strict",
+    themeVariables: {
+      fontFamily: "'Helvetica Neue', Arial, sans-serif",
+      primaryColor: "#f4f4f5", primaryBorderColor: "#141416", primaryTextColor: "#141416",
+      lineColor: "#141416", clusterBkg: "#ffffff", clusterBorder: "#141416",
+    }});
+  window.addEventListener("load", () => mermaid.run({ nodes: document.querySelectorAll(".mermaid") }));
+</script>

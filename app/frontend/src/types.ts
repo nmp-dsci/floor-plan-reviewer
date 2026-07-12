@@ -11,9 +11,11 @@ export interface Room {
   z: number;
 }
 
+export type OpeningType = 'door' | 'window' | 'open';
+
 export interface Opening {
   id: string;
-  type: 'door' | 'window' | 'open';
+  type: OpeningType;
   t0: number;
   t1: number;
 }
@@ -28,6 +30,7 @@ export interface Wall {
 }
 
 export interface Fixture {
+  id: string;
   x: number;
   y: number;
   w: number;
@@ -51,12 +54,15 @@ export interface Rent {
   proposed_per_week: number;
 }
 
+export type Author = 'agent' | 'human';
+
 export interface Change {
   id: string;
   title: string;
   rationale: string;
   rent_impact_per_week: number;
   flags: string[];
+  author?: Author;
 }
 
 export interface RegisterLine {
@@ -70,6 +76,7 @@ export interface RegisterHunk {
   impact: string;
   rationale: string;
   flags: string[];
+  author?: Author;
   lines: RegisterLine[];
 }
 
@@ -123,18 +130,35 @@ export interface WallSelection {
   whole: boolean;
 }
 
+export interface OpeningSelection {
+  id: string;
+  wallId: string;
+}
+
 export interface Selection {
   rooms: string[];
   walls: WallSelection[];
+  fixtures: string[];
+  openings: OpeningSelection[];
 }
 
-export const emptySelection = (): Selection => ({ rooms: [], walls: [] });
+export const emptySelection = (): Selection => ({
+  rooms: [],
+  walls: [],
+  fixtures: [],
+  openings: [],
+});
+
+export const hasSelection = (s: Selection): boolean =>
+  s.rooms.length > 0 || s.walls.length > 0 || s.fixtures.length > 0 || s.openings.length > 0;
+
+export type Tool = 'select' | 'add-opening' | 'add-fixture';
 
 export interface QueuedComment {
   id: string;
   text: string;
   targets: {
-    type: 'room' | 'wall';
+    type: 'room' | 'wall' | 'fixture';
     id: string;
     t0?: number;
     t1?: number;

@@ -71,12 +71,21 @@ def diff_geometries(a: PlanGeometry, b: PlanGeometry) -> list[DiffLine]:
         if not touches_churn(k):
             lines.append(DiffLine(op="add", obj="opening", id=k, after=ob[k]))
 
-    fa = {f.key(): f for f in a.fixtures}
-    fb = {f.key(): f for f in b.fixtures}
-    for k in sorted(str(x) for x in fa.keys() - fb.keys()):
-        lines.append(DiffLine(op="remove", obj="fixture", id=k, before=f"fixture {k}"))
-    for k in sorted(str(x) for x in fb.keys() - fa.keys()):
-        lines.append(DiffLine(op="add", obj="fixture", id=k, after=f"fixture {k}"))
+    fa = {f.id: f for f in a.fixtures}
+    fb = {f.id: f for f in b.fixtures}
+    for fid in sorted(fa.keys() - fb.keys()):
+        lines.append(DiffLine(op="remove", obj="fixture", id=fid, before=fa[fid].describe()))
+    for fid in sorted(fb.keys() - fa.keys()):
+        lines.append(DiffLine(op="add", obj="fixture", id=fid, after=fb[fid].describe()))
+    for fid in sorted(fa.keys() & fb.keys()):
+        fx, fy = fa[fid], fb[fid]
+        moved = abs(fx.x - fy.x) + abs(fx.y - fy.y) + abs(fx.w - fy.w) + abs(fx.h - fy.h) > 0.05
+        if moved or fx.label != fy.label:
+            lines.append(
+                DiffLine(
+                    op="modify", obj="fixture", id=fid, before=fx.describe(), after=fy.describe()
+                )
+            )
 
     return lines
 
@@ -100,6 +109,7 @@ def register_hunk(change: Change, lines: list[DiffLine]) -> dict[str, object]:
         "impact": impact,
         "rationale": change.rationale,
         "flags": change.flags,
+        "author": change.author,
         "lines": body,
     }
 

@@ -1,0 +1,35 @@
+1
+00:00:00,607 --> 00:00:12,653
+Floor-Plan Studio has a new home. A left navigation rail carries your review history — every property, its configuration, and the weekly-rent uplift, in green.
+
+2
+00:00:12,653 --> 00:00:24,395
+Open a review and the header is now a single compact bar. The money story stays in view: nine hundred a week baseline, twelve-sixty proposed, plus three-sixty.
+
+3
+00:00:24,395 --> 00:00:32,346
+Every room now shows its dimensions, always — no more guessing the size of a space.
+
+4
+00:00:32,346 --> 00:00:41,086
+Here's the headline change. Click any room and it opens in the inspector — name, kind, fill, and exact metres.
+
+5
+00:00:41,086 --> 00:00:49,268
+Rename the store to a study and make it habitable. The edit previews on the plan in amber, and batches until you apply.
+
+6
+00:00:49,268 --> 00:00:58,947
+Apply. It lands in under a second — no agent, no waiting. The building envelope is still validated on every edit.
+
+7
+00:00:58,947 --> 00:01:08,509
+And the change register now tags every version: this one is marked HUMAN, the agent's edits are marked AGENT. One plan, two authors.
+
+8
+00:01:08,509 --> 00:01:17,663
+Thin-line joinery is first-class too. Benches and cabinetry are now selectable objects you can rename, move, or resize.
+
+9
+00:01:17,663 --> 00:01:25,946
+Navigation, direct editing, shared authorship. Humans and the agent now edit the same canvas.

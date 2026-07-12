@@ -1,17 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import type { PlanListItem } from '../types';
 
-export default function Library() {
+export default function Library({ uploadFocus = false, notFound = false }: { uploadFocus?: boolean; notFound?: boolean }) {
   const [plans, setPlans] = useState<PlanListItem[]>([]);
   const [error, setError] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [address, setAddress] = useState('');
   const [uploading, setUploading] = useState(false);
+  const uploadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api.plans().then(setPlans).catch((e) => setError(String(e)));
   }, []);
+
+  useEffect(() => {
+    if (uploadFocus) uploadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [uploadFocus]);
 
   const upload = async () => {
     if (!file) return;
@@ -35,6 +40,7 @@ export default function Library() {
           convert it to editable geometry.
         </div>
       </header>
+      {notFound && <div className="banner error">That page doesn’t exist — showing the library.</div>}
       {error && <div className="banner error">{error}</div>}
       <div className="grid">
         <div className="card">
@@ -50,23 +56,33 @@ export default function Library() {
                 </tr>
               </thead>
               <tbody>
-                {plans.map((p) => (
-                  <tr
-                    key={p.plan_id}
-                    className={p.review_id ? 'click' : ''}
-                    onClick={() => {
-                      if (p.review_id) window.location.hash = `#/review/${p.review_id}`;
-                      else window.location.hash = `#/ingest/${p.plan_id}`;
-                    }}
-                  >
-                    <td>
-                      <b>{p.address || p.slug}</b>
-                    </td>
-                    <td>{p.config ?? '—'}</td>
-                    <td>{p.head_n !== undefined ? `v${String(p.head_n).padStart(2, '0')}` : 'needs ingest'}</td>
-                    <td>{p.rent ? `$${p.rent.proposed_per_week.toFixed(0)}/wk` : '—'}</td>
-                  </tr>
-                ))}
+                {plans.map((p) => {
+                  const uplift = p.rent ? p.rent.proposed_per_week - p.rent.baseline_per_week : null;
+                  return (
+                    <tr
+                      key={p.plan_id}
+                      className={p.review_id ? 'click' : ''}
+                      onClick={() => {
+                        if (p.review_id) window.location.hash = `#/review/${p.review_id}`;
+                        else window.location.hash = `#/ingest/${p.plan_id}`;
+                      }}
+                    >
+                      <td>
+                        <b>{p.address || p.slug}</b>
+                      </td>
+                      <td>{p.config ?? '—'}</td>
+                      <td>{p.head_n !== undefined ? `v${String(p.head_n).padStart(2, '0')}` : 'needs ingest'}</td>
+                      <td>
+                        {p.rent ? `$${p.rent.proposed_per_week.toFixed(0)}/wk` : '—'}
+                        {uplift !== null && uplift !== 0 && (
+                          <span className={`mono ${uplift > 0 ? 'up' : 'down'}`} style={{ marginLeft: 6, fontSize: 11 }}>
+                            {uplift > 0 ? '+' : '−'}${Math.abs(uplift).toFixed(0)}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {plans.length === 0 && (
                   <tr>
                     <td colSpan={4} style={{ color: 'var(--faint)' }}>
@@ -78,7 +94,7 @@ export default function Library() {
             </table>
           </div>
         </div>
-        <div className="card">
+        <div className="card" ref={uploadRef}>
           <h2>Upload a floor plan</h2>
           <div className="body">
             <div className="field">

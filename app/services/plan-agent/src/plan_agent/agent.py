@@ -51,6 +51,8 @@ comment using ONLY the typed operations available. Rules:
   (type "door" ~0.9m, "window", or "open" for wide openings).
 - To repurpose a room (e.g. store → study) use set_kind with a new name/kind and fill "white"
   for habitable use; use split_room / merge_rooms for layout surgery; keep every room ≥ 0.7m.
+- Fixtures (cabinetry, benches, robes — thin-line joinery) have stable ids like
+  `fx:island-bench-1`: use add_fixture / modify_fixture / remove_fixture with fixture_id.
 - Prefer the smallest set of ops that satisfies the comments. Estimate the weekly rent impact
   honestly — small cosmetic changes are $0-10; new habitable rooms more.
 """
@@ -69,9 +71,9 @@ def _describe_geometry(geo: PlanGeometry) -> str:
         ops = ", ".join(f"{o.id}:{o.type}@{o.t0:.2f}-{o.t1:.2f}" for o in w.openings) or "none"
         lines.append(f"- {w.id} · {w.a}↔{w.b} · {w.length:.2f}m · {ops}")
     if geo.fixtures:
-        lines.append("\nFIXTURES (index · rect · label):")
-        for i, f in enumerate(geo.fixtures):
-            lines.append(f"- {i} · ({f.x:.2f},{f.y:.2f},{f.w:.2f},{f.h:.2f}) · {f.label or '-'}")
+        lines.append("\nFIXTURES (id · rect · label):")
+        for f in geo.fixtures:
+            lines.append(f"- {f.id} · ({f.x:.2f},{f.y:.2f},{f.w:.2f},{f.h:.2f}) · {f.label or '-'}")
     return "\n".join(lines)
 
 
@@ -83,7 +85,7 @@ def _describe_comments(comments: list[dict[str, Any]]) -> str:
             + (f" chunk t={t['t0']:.2f}-{t['t1']:.2f}" if t.get("t0") is not None else "")
             for t in c.get("targets", [])
         )
-        lines.append(f"{i}. \"{c['text']}\"  [targets: {targets or 'whole plan'}]")
+        lines.append(f'{i}. "{c["text"]}"  [targets: {targets or "whole plan"}]')
     return "\n".join(lines)
 
 

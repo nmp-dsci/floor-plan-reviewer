@@ -1,4 +1,4 @@
-.PHONY: up down logs test smoke demo
+.PHONY: up down logs test smoke demo demo-whats-new demo-tour demo-videos reseed
 
 up:
 	docker compose up --build -d
@@ -25,3 +25,22 @@ smoke:
 
 demo:
 	cd demo && uv sync -q && uv run playwright install chromium && uv run python record_walkthrough.py
+
+# Wipe Postgres + storage and wait for a pristine reseed (head = v03).
+reseed:
+	docker compose down -v
+	docker compose up -d
+	@printf "waiting for backend"; \
+	until curl -sf http://localhost:8090/api/plans | grep -q peats; do printf "."; sleep 1; done; \
+	echo " reseeded."
+
+# The two narrated walkthroughs the product ships with. Each records against a
+# freshly reseeded stack so the STORE→STUDY human edit always has a clean start.
+demo-whats-new: reseed
+	cd demo && uv sync -q && uv run playwright install chromium && uv run python record_whats_new.py
+
+demo-tour: reseed
+	cd demo && uv sync -q && uv run playwright install chromium && uv run python record_product_tour.py
+
+demo-videos: demo-whats-new demo-tour
+	@echo "both videos in app/demo/artifacts: whats_new.mp4 · product_tour.mp4"

@@ -1,0 +1,43 @@
+1
+00:00:00,618 --> 00:00:10,875
+Floor-Plan Studio. The library lists every property; the rail on the left is your review history, with the rent uplift for each.
+
+2
+00:00:10,875 --> 00:00:20,655
+Open the seeded property. The context bar keeps the numbers in view — nine hundred a week today, twelve-sixty proposed.
+
+3
+00:00:20,655 --> 00:00:32,101
+The plan is a live shape object, not a picture. Every room, wall, opening, and fixture is a real thing you can select — and every room shows its dimensions.
+
+4
+00:00:32,101 --> 00:00:41,457
+Delta view is a computed geometry diff against the original. Green added, red removed, amber modified.
+
+5
+00:00:41,457 --> 00:00:54,205
+You can edit directly. Rename the store to a study, make it habitable, and apply — it lands in under a second, validated, with no agent.
+
+6
+00:00:54,205 --> 00:00:59,452
+Or hand a change to the agent. Select the wall between the living area and the kitchen.
+
+7
+00:00:59,452 --> 00:01:08,743
+Describe the change in plain English: a servery window, and an island bench. Comments queue locally.
+
+8
+00:01:08,743 --> 00:01:17,615
+Send. The DeepSeek agent replies with typed geometry operations — never pixels — and the envelope can never grow.
+
+9
+00:01:17,615 --> 00:01:27,355
+The new version arrives live, with the servery window, the bench, and a fresh rent estimate.
+
+10
+00:01:27,355 --> 00:01:41,043
+The change register interleaves both authors — HUMAN and AGENT — and every line traces back to a geometry object. Export any version as a plan or a summary.
+
+11
+00:01:41,043 --> 00:01:48,674
+Select, edit or ask, done. One canvas, shared by you and the agent.

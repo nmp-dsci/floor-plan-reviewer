@@ -144,3 +144,57 @@ def test_compliance_flags(v03) -> None:
 def test_export_png(v03, tmp_path) -> None:
     out = render_png(v03, tmp_path / "v03.png", "Proposed plan (v03)", "parity check")
     assert out.exists() and out.stat().st_size > 10_000
+
+
+def test_fixture_ids_backfilled_deterministically(v03) -> None:
+    assert v03.fixtures, "seed plan should carry fixtures"
+    assert all(f.id.startswith("fx:") for f in v03.fixtures)
+    assert len({f.id for f in v03.fixtures}) == len(v03.fixtures)
+    # same JSON read twice → same ids
+    again = load("v03")
+    assert [f.id for f in again.fixtures] == [f.id for f in v03.fixtures]
+
+
+def test_modify_and_remove_fixture_by_id(v03) -> None:
+    fx = v03.fixtures[0]
+    result = apply_ops(
+        v03,
+        parse_ops(
+            [
+                {"op": "modify_fixture", "fixture_id": fx.id, "w": fx.w + 0.6, "label": "BENCH XL"},
+                {
+                    "op": "add_fixture",
+                    "x": fx.x,
+                    "y": fx.y + 2,
+                    "w": 1.0,
+                    "h": 0.5,
+                    "label": "desk",
+                },
+            ]
+        ),
+    )
+    assert result.warnings == []
+    changed = result.geometry.fixture(fx.id)
+    assert abs(changed.w - (fx.w + 0.6)) < 1e-6 and changed.label == "BENCH XL"
+    added = next(f for f in result.geometry.fixtures if f.label == "desk")
+    assert added.id.startswith("fx:desk-")
+    lines = diff_geometries(v03, result.geometry)
+    assert any(line.obj == "fixture" and line.op == "modify" and line.id == fx.id for line in lines)
+    assert any(line.obj == "fixture" and line.op == "add" for line in lines)
+
+    removed = apply_ops(
+        result.geometry, parse_ops([{"op": "remove_fixture", "fixture_id": added.id}])
+    )
+    assert removed.warnings == []
+    assert all(f.id != added.id for f in removed.geometry.fixtures)
+
+    missing = apply_ops(v03, parse_ops([{"op": "remove_fixture", "fixture_id": "fx:nope-9"}]))
+    assert any("not found" in w for w in missing.warnings)
+
+
+def test_change_author_defaults_to_agent_and_lands_in_hunk(v03) -> None:
+    lines = diff_geometries(v03, v03)
+    agent_hunk = register_hunk(Change(id="c01", title="agent change"), lines)
+    human_hunk = register_hunk(Change(id="c02", title="manual edit", author="human"), lines)
+    assert agent_hunk["author"] == "agent"
+    assert human_hunk["author"] == "human"

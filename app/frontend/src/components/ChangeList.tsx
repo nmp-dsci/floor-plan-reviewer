@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { QueuedComment, Selection } from '../types';
+import { hasSelection } from '../types';
 
 interface Props {
   selection: Selection;
@@ -23,7 +24,7 @@ export default function ChangeList({
   onClearSelection,
 }: Props) {
   const [text, setText] = useState('');
-  const hasSelection = selection.rooms.length > 0 || selection.walls.length > 0;
+  const selected = hasSelection(selection);
 
   const add = () => {
     if (!text.trim()) return;
@@ -32,6 +33,7 @@ export default function ChangeList({
       text: text.trim(),
       targets: [
         ...selection.rooms.map((id) => ({ type: 'room' as const, id })),
+        ...selection.fixtures.map((id) => ({ type: 'fixture' as const, id })),
         ...selection.walls.map((w) => ({
           type: 'wall' as const,
           id: w.id,
@@ -45,11 +47,14 @@ export default function ChangeList({
 
   return (
     <>
-      {hasSelection && (
+      {selected && (
         <div className="comment-panel">
           <div className="chips">
             {selection.rooms.map((id) => (
               <span key={id} className="chip">{id}</span>
+            ))}
+            {selection.fixtures.map((id) => (
+              <span key={id} className="chip">{id.replace('fx:', '')}</span>
             ))}
             {selection.walls.map((w) => (
               <span key={w.id} className="chip">
@@ -77,8 +82,8 @@ export default function ChangeList({
       <div className="body">
         {queue.length === 0 && (
           <div style={{ color: 'var(--faint)', fontSize: 13, marginBottom: 8 }}>
-            Nothing queued. Click a room or wall on the plan (long-press or shift-click for
-            multi-select), write a comment, add it here.
+            Nothing queued. Select any object, describe the change you want, and add it — the agent
+            re-prices and returns validated geometry.
           </div>
         )}
         {queue.length > 0 && (
@@ -90,7 +95,7 @@ export default function ChangeList({
                   <span className="chips">
                     {c.targets.map((t, i) => (
                       <span key={i} className="chip">
-                        {t.id.replace('w:', '')}
+                        {t.id.replace('w:', '').replace('fx:', '')}
                         {t.t0 !== undefined ? ` · ${t.t0.toFixed(2)}–${(t.t1 ?? 1).toFixed(2)}` : ''}
                       </span>
                     ))}

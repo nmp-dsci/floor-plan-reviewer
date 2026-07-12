@@ -1,7 +1,6 @@
 """Floor-Plan Studio backend-api."""
 
 import asyncio
-import json
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -11,7 +10,15 @@ import httpx
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
-from plan_core import Change, PlanGeometry, diff_geometries, register_hunk, validate
+from plan_core import (
+    Change,
+    PlanGeometry,
+    apply_ops,
+    diff_geometries,
+    parse_ops,
+    register_hunk,
+    validate,
+)
 from plan_core.export import render_png
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -33,9 +40,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="floor-plan-studio backend-api", lifespan=lifespan)
-app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
 # ---------- helpers ----------
@@ -66,6 +71,15 @@ def _version_summary(v: Version) -> dict[str, Any]:
         "config": geo.summary_config(),
         "created_at": v.created_at.isoformat(),
     }
+
+
+def _job_running(db, review_id: str) -> bool:
+    return (
+        db.execute(
+            select(Job).where(Job.review_id == review_id, Job.status.in_(("queued", "running")))
+        ).scalar_one_or_none()
+        is not None
+    )
 
 
 # ---------- basic reads ----------
@@ -132,7 +146,8 @@ def get_version(review_id: str, n: int) -> dict[str, Any]:
         prev = byn.get(n - 1)
         return {
             "n": v.n,
-            "geometry": v.geometry,
+            # serialize through the model so fixture-id backfill reaches the client
+            "geometry": geo.model_dump(),
             "rent": v.rent,
             "changes": v.changes,
             "register": v.register,
@@ -174,6 +189,8 @@ async def submit_comments(review_id: str, batch: CommentBatch) -> dict[str, str]
             raise HTTPException(
                 409, f"stale submit: head is v{head.n}, you commented on v{batch.version_n}"
             )
+        if _job_running(db, review_id):
+            raise HTTPException(409, "an agent job is already running for this review")
         job = Job(review_id=review_id, status="queued")
         db.add(job)
         db.commit()
@@ -215,7 +232,11 @@ async def _run_job(job_id: str, review_id: str, batch: CommentBatch) -> None:
         async with httpx.AsyncClient(timeout=600) as client:
             resp = await client.post(
                 f"{AGENT_URL}/apply",
-                json={"geometry": head_geo, "comments": batch.model_dump()["comments"], "context": context},
+                json={
+                    "geometry": head_geo,
+                    "comments": batch.model_dump()["comments"],
+                    "context": context,
+                },
             )
         if resp.status_code != 200:
             raise RuntimeError(f"agent error {resp.status_code}: {resp.text[:400]}")
@@ -240,8 +261,7 @@ async def _run_job(job_id: str, review_id: str, batch: CommentBatch) -> None:
                 "currency": "AUD",
                 "baseline_per_week": review.baseline_per_week,
                 "proposed_per_week": round(
-                    float(head_now.rent.get("proposed_per_week", 0))
-                    + change.rent_impact_per_week
+                    float(head_now.rent.get("proposed_per_week", 0)) + change.rent_impact_per_week
                 ),
             }
             version = Version(
@@ -281,7 +301,7 @@ async def events(review_id: str) -> StreamingResponse:
                 try:
                     payload = await asyncio.wait_for(q.get(), timeout=15)
                     yield f"data: {payload}\n\n"
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     yield ": keepalive\n\n"
         finally:
             hub.unsubscribe(review_id, q)
@@ -291,6 +311,102 @@ async def events(review_id: str) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ---------- direct human edits (no LLM) ----------
+
+
+class EditBatch(BaseModel):
+    version_n: int
+    ops: list[dict[str, Any]]
+    title: str = ""
+
+
+@app.post("/api/reviews/{review_id}/edits", status_code=201)
+def apply_edits(review_id: str, batch: EditBatch) -> dict[str, Any]:
+    """Human edits: the same pipeline as the agent (apply_ops → validate → version),
+    minus the LLM. Rent is carried unchanged and flagged for re-assessment."""
+    try:
+        ops = parse_ops(batch.ops)
+    except Exception as exc:  # noqa: BLE001 — surface schema errors as 422
+        raise HTTPException(422, f"invalid ops: {exc}") from exc
+    if not ops:
+        raise HTTPException(422, "no ops supplied")
+
+    with session() as db:
+        review = db.get(Review, review_id)
+        if not review:
+            raise HTTPException(404, "review not found")
+        versions = _versions(db, review_id)
+        head = versions[-1]
+        if head.n != batch.version_n:
+            raise HTTPException(
+                409, f"stale edit: head is v{head.n}, you edited v{batch.version_n}"
+            )
+        if _job_running(db, review_id):
+            raise HTTPException(409, "an agent job is running — wait for it to finish")
+
+        head_geo = _geo(head)
+        result = apply_ops(head_geo, ops)
+        new_geo = result.geometry
+        new_geo.meta["envelope"] = _geo(versions[0]).meta.get(
+            "envelope", new_geo.meta.get("envelope")
+        )
+        errors, warnings = validate(new_geo)
+        if errors:
+            raise HTTPException(422, "; ".join(errors[:5]))
+
+        change = Change(
+            id=f"c{sum(len(v.changes) for v in versions) + 1:02d}",
+            title=batch.title or "Manual geometry edit",
+            rationale="Applied directly by the owner in the plan editor.",
+            rent_impact_per_week=0,
+            flags=["rent not re-assessed"],
+            author="human",
+        )
+        hunk = register_hunk(change, diff_geometries(head_geo, new_geo))
+        version = Version(
+            review_id=review_id,
+            n=head.n + 1,
+            geometry=new_geo.model_dump(),
+            changes=[change.model_dump()],
+            register=[hunk],
+            rent=dict(head.rent),
+        )
+        db.add(version)
+        db.commit()
+        new_n = version.n
+
+    hub.publish(
+        review_id,
+        {
+            "type": "version.ready",
+            "n": new_n,
+            "job_id": "",
+            "warnings": result.warnings + warnings,
+        },
+    )
+    return {"n": new_n, "warnings": result.warnings + warnings}
+
+
+@app.get("/api/reviews/{review_id}/registers")
+def get_registers(review_id: str) -> list[dict[str, Any]]:
+    """All version registers in one round-trip (replaces the per-version N+1)."""
+    with session() as db:
+        if not db.get(Review, review_id):
+            raise HTTPException(404, "review not found")
+        return [{"n": v.n, "register": v.register} for v in _versions(db, review_id) if v.n > 0]
+
+
+@app.get("/api/plans/{plan_id}/image")
+def plan_image(plan_id: str) -> FileResponse:
+    with session() as db:
+        plan = db.get(Plan, plan_id)
+        if not plan or not plan.image_path:
+            raise HTTPException(404, "plan has no source image")
+        path = plan.image_path
+    media = "image/png" if path.endswith("png") else "image/jpeg"
+    return FileResponse(path, media_type=media)
 
 
 # ---------- exports & comps ----------
@@ -332,9 +448,8 @@ def summary_md(review_id: str) -> Response:
     for v in versions[1:]:
         for c in v.changes:
             flags = " · ".join(c.get("flags", [])[:3])
-            lines.append(
-                f"| v{v.n:02d} | {c['title']} | +${c.get('rent_impact_per_week', 0):.0f}/wk | {flags} |"
-            )
+            impact = c.get("rent_impact_per_week", 0)
+            lines.append(f"| v{v.n:02d} | {c['title']} | +${impact:.0f}/wk | {flags} |")
     if review.comps:
         lines += ["", "## Rent evidence", ""]
         for comp in review.comps:
@@ -402,8 +517,9 @@ async def ingest_plan(plan_id: str) -> dict[str, Any]:
         image_path = plan.image_path
         address = plan.address
     import base64
+    from pathlib import Path
 
-    data = base64.b64encode(open(image_path, "rb").read()).decode()
+    data = base64.b64encode(Path(image_path).read_bytes()).decode()
     media = "image/png" if image_path.endswith("png") else "image/jpeg"
     async with httpx.AsyncClient(timeout=600) as client:
         resp = await client.post(

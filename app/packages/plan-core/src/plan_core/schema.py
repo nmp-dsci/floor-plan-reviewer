@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 Kind = Literal[
     "bedroom",
@@ -104,15 +105,24 @@ class Wall(BaseModel):
         return f"{pair:<24} {self.length:.1f}m"
 
 
+def fixture_slug(label: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-") or "unit"
+
+
 class Fixture(BaseModel):
+    """Thin-line joinery: cabinetry, benches, robes. `id` is stable (`fx:<slug>-<n>`);
+    geometries stored before ids existed get deterministic ids backfilled on read."""
+
+    id: str = ""
     x: float
     y: float
     w: float
     h: float
     label: str = ""
 
-    def key(self) -> tuple[float, float, float, float, str]:
-        return (round(self.x, 2), round(self.y, 2), round(self.w, 2), round(self.h, 2), self.label)
+    def describe(self) -> str:
+        name = (self.label or "fixture").lower()
+        return f"{name:<16} {self.w:.1f} x {self.h:.1f}m at ({self.x:.1f},{self.y:.1f})"
 
 
 class Change(BaseModel):
@@ -123,6 +133,7 @@ class Change(BaseModel):
     rationale: str = ""
     rent_impact_per_week: float = 0
     flags: list[str] = Field(default_factory=list)
+    author: Literal["agent", "human"] = "agent"
 
 
 class Rent(BaseModel):
@@ -140,11 +151,36 @@ class PlanGeometry(BaseModel):
     fixtures: list[Fixture] = Field(default_factory=list)
     meta: dict[str, Any] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def _backfill_fixture_ids(self) -> PlanGeometry:
+        """Deterministic ids for pre-id geometries: fx:<label-slug>-<k> by occurrence
+        order, so the same stored JSON always reads back with the same ids."""
+        taken = {f.id for f in self.fixtures if f.id}
+        counts: dict[str, int] = {}
+        for f in self.fixtures:
+            if f.id:
+                continue
+            slug = fixture_slug(f.label)
+            counts[slug] = counts.get(slug, 0) + 1
+            fid = f"fx:{slug}-{counts[slug]}"
+            while fid in taken:
+                counts[slug] += 1
+                fid = f"fx:{slug}-{counts[slug]}"
+            f.id = fid
+            taken.add(fid)
+        return self
+
     def room(self, rid: str) -> Room:
         for r in self.rooms:
             if r.id == rid:
                 return r
         raise KeyError(f"no room '{rid}'")
+
+    def fixture(self, fid: str) -> Fixture:
+        for f in self.fixtures:
+            if f.id == fid:
+                return f
+        raise KeyError(f"no fixture '{fid}'")
 
     def wall(self, wid: str) -> Wall:
         for w in self.walls:

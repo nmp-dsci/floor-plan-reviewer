@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, TypeAdapter
 
 from plan_core.convert import kind_for, slugify
-from plan_core.schema import Fixture, Kind, Opening, OpeningType, PlanGeometry, Room
+from plan_core.schema import Fixture, Kind, Opening, OpeningType, PlanGeometry, Room, fixture_slug
 from plan_core.walls import derive_walls, locate_wall
 
 
@@ -100,9 +100,20 @@ class AddFixture(BaseModel):
     label: str = ""
 
 
+class ModifyFixture(BaseModel):
+    op: Literal["modify_fixture"]
+    fixture_id: str
+    x: float | None = None
+    y: float | None = None
+    w: float | None = None
+    h: float | None = None
+    label: str | None = None
+
+
 class RemoveFixture(BaseModel):
     op: Literal["remove_fixture"]
-    index: int
+    fixture_id: str = ""
+    index: int | None = None  # legacy positional form; prefer fixture_id
 
 
 _OpUnion = (
@@ -117,6 +128,7 @@ _OpUnion = (
     | RemoveOpening
     | RemoveWallChunk
     | AddFixture
+    | ModifyFixture
     | RemoveFixture
 )
 Op = Annotated[_OpUnion, Field(discriminator="op")]
@@ -282,9 +294,35 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
             if len(abs_openings) == before:
                 warnings.append(f"remove_opening: '{op.opening_id}' not found; skipped")
         elif isinstance(op, AddFixture):
-            g.fixtures.append(Fixture(x=op.x, y=op.y, w=op.w, h=op.h, label=op.label))
+            slug = fixture_slug(op.label)
+            k = 1
+            while any(f.id == f"fx:{slug}-{k}" for f in g.fixtures):
+                k += 1
+            g.fixtures.append(
+                Fixture(id=f"fx:{slug}-{k}", x=op.x, y=op.y, w=op.w, h=op.h, label=op.label)
+            )
+        elif isinstance(op, ModifyFixture):
+            fx = next((f for f in g.fixtures if f.id == op.fixture_id), None)
+            if fx is None:
+                warnings.append(f"modify_fixture: '{op.fixture_id}' not found; skipped")
+                continue
+            if op.x is not None:
+                fx.x = op.x
+            if op.y is not None:
+                fx.y = op.y
+            if op.w is not None:
+                fx.w = op.w
+            if op.h is not None:
+                fx.h = op.h
+            if op.label is not None:
+                fx.label = op.label
         elif isinstance(op, RemoveFixture):
-            if 0 <= op.index < len(g.fixtures):
+            if op.fixture_id:
+                before_n = len(g.fixtures)
+                g.fixtures = [f for f in g.fixtures if f.id != op.fixture_id]
+                if len(g.fixtures) == before_n:
+                    warnings.append(f"remove_fixture: '{op.fixture_id}' not found; skipped")
+            elif op.index is not None and 0 <= op.index < len(g.fixtures):
                 g.fixtures.pop(op.index)
             else:
                 warnings.append(f"remove_fixture: index {op.index} out of range; skipped")

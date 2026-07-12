@@ -1,4 +1,24 @@
-# Floor-Plan Studio — demo walkthrough
+# Floor-Plan Studio — demo walkthroughs
+
+Three narrated videos, each a real unedited Playwright session against the local compose stack
+(`make -C app up`). **Narration is spoken** (Deepgram Aura TTS, Australian voice
+`aura-2-hyperion-en`) *and* burned in as the caption bar — one compact line per scene, timed to
+hold while its line plays; a matching `.srt` sidecar and a silent `.webm` cut sit beside each
+`.mp4`. Without a `DEEPGRAM_API_KEY` the recordings still run captions-only.
+
+| Video | Make target | What it shows |
+|---|---|---|
+| `artifacts/whats_new.mp4` (~85s) | `make -C app demo-whats-new` | The P1–P5 upgrade: left-nav shell + address history, the compact context bar with the rent story, always-visible room dims, and the headline change — humans editing geometry directly through the same validated op pipeline, landing a **HUMAN**-authored version with no LLM round-trip. |
+| `artifacts/product_tour.mp4` (~108s) | `make -C app demo-tour` | The full updated loop end to end: library → review → delta → a direct **HUMAN** edit (store → study, instant) → a live **DeepSeek AGENT** round-trip (servery window + island bench) → the change register where human and agent hunks interleave. |
+| `artifacts/walkthrough.mp4` | `make -C app demo` | The original P0–P5 walkthrough (pre-shared-editing UI), kept for reference. |
+
+`make -C app demo-videos` records both new videos back to back, reseeding the stack before each so
+the store→study human edit always starts clean. Both new scripts share `demo/narration.py` (TTS +
+caption bar + SRT + audio mix). The section below documents the original walkthrough scene by scene.
+
+---
+
+## Original walkthrough — scene by scene
 
 **Video:** `artifacts/walkthrough.mp4` — a real, unedited session recorded with Playwright
 against the local compose stack (`make -C app up`), including a live agent round-trip.

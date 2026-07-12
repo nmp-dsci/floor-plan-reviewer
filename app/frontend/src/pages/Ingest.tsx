@@ -48,8 +48,8 @@ export default function Ingest({ planId }: { planId: string }) {
         </div>
         <h1>Vision ingestion</h1>
         <div className="sub">
-          The vision agent (Claude) reads the uploaded image and drafts schema-v2 geometry. Review
-          the draft, set the current weekly rent, then approve to open the review.
+          The vision agent (Claude) reads the uploaded image and drafts schema-v2 geometry. Compare
+          the draft against the source, set the current weekly rent, then approve to open the review.
         </div>
       </header>
       {error && <div className="banner error">{error}</div>}
@@ -57,6 +57,9 @@ export default function Ingest({ planId }: { planId: string }) {
         <div className="card">
           <h2>Step 1 — extract geometry</h2>
           <div className="body">
+            <div className="ingest-preview">
+              <img src={api.planImageUrl(planId)} alt="Uploaded floor plan" />
+            </div>
             <button className="primary" onClick={run} disabled={running}>
               {running ? 'Vision agent reading the plan… (30–90s)' : 'Extract with vision agent'}
             </button>
@@ -66,14 +69,26 @@ export default function Ingest({ planId }: { planId: string }) {
       {draft && (
         <div className="grid">
           <div className="card">
-            <h2>Draft geometry</h2>
-            <PlanCanvas
-              geometry={draft.geometry}
-              mode="proposed"
-              selection={emptySelection()}
-              onSelectionChange={() => undefined}
-              interactive={false}
-            />
+            <h2>
+              <span>Source ↔ draft geometry</span>
+              <small>visual parity check</small>
+            </h2>
+            <div className="ingest-compare">
+              <figure>
+                <img src={api.planImageUrl(planId)} alt="Uploaded floor plan" />
+                <figcaption>Uploaded image</figcaption>
+              </figure>
+              <figure>
+                <PlanCanvas
+                  geometry={draft.geometry}
+                  mode="proposed"
+                  selection={emptySelection()}
+                  onSelectionChange={() => undefined}
+                  interactive={false}
+                />
+                <figcaption>Extracted geometry</figcaption>
+              </figure>
+            </div>
           </div>
           <div>
             <div className="card">

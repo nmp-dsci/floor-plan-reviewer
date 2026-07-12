@@ -96,7 +96,13 @@ export function diffRooms(original: PlanGeometry, proposed: PlanGeometry): RoomD
   return { removed, added, modified };
 }
 
+// Dims are always shown on every room (style-guide invariant): '-' used to mean
+// "suppress" in the v1 source format, but we now auto-derive instead of hiding.
 export function autoDims(room: Room): string {
-  if (room.dims === '-') return '';
-  return room.dims || `${room.w.toFixed(1)} x ${room.h.toFixed(1)}m`;
+  if (!room.dims || room.dims === '-') return `${room.w.toFixed(1)} x ${room.h.toFixed(1)}m`;
+  return room.dims;
+}
+
+export function snapM(v: number, step = 0.05): number {
+  return Math.round(v / step) * step;
 }

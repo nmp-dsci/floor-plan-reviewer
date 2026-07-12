@@ -1,6 +1,7 @@
 """Per-review SSE broadcast hub."""
 
 import asyncio
+import contextlib
 import json
 from typing import Any
 
@@ -20,10 +21,8 @@ class Hub:
     def publish(self, key: str, event: dict[str, Any]) -> None:
         payload = json.dumps(event)
         for q in list(self._subs.get(key, set())):
-            try:
+            with contextlib.suppress(asyncio.QueueFull):
                 q.put_nowait(payload)
-            except asyncio.QueueFull:
-                pass
 
 
 hub = Hub()

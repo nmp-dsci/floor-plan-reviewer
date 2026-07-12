@@ -278,6 +278,21 @@ questions; new wet areas need waterproofing certification and drainage runs. Alw
 - Property folders contain only the contract files above; scratch/preview renders go to the
   session scratchpad, not property folders.
 
+## Frontend style guide (Floor-Plan Studio app)
+
+**Decided 2026-07-12: "Drafting Ink"** — the app's brutalist ink/paper/red drafting aesthetic,
+formalised. Full guide (tokens, type scale, component recipes, canvas rules, do/don'ts) lives in
+the skill [`.claude/skills/frontend-style/SKILL.md`](./.claude/skills/frontend-style/SKILL.md) —
+**load it before creating or modifying anything under `app/frontend/`**. Invariants in short:
+
+- Design tokens live in `app/frontend/src/styles.css` `:root` — no colour/font/spacing outside them.
+- Monochrome ink-on-paper chrome; fixed accent meanings: red = selection / negative change,
+  green = positive change — rent deltas are green when positive, red when negative, everywhere.
+- All numerals (rent, dims, versions) in the mono stack; UI labels uppercase + letterspaced.
+- Room dimension labels are always visible on every room — shrink, never auto-hide.
+- No shadows, border-radius, or gradients anywhere.
+- Canvas semantics are LOCKED: ink walls, red selection, green/red/amber delta — never restyled.
+
 ## Roadmap (later phases — not v1)
 
 1. Renderer unit tests + `jsonschema` validation of `changes_v##.json`.
