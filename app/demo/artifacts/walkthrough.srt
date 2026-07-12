@@ -1,39 +1,39 @@
 1
-00:00:00,216 --> 00:00:04,632
-FLOOR-PLAN STUDIO — the plan library. 231 Peats Ferry Rd is seeded at v03, $1,260/wk. Any listing floor-plan image can be uploaded for AI vision ingestion.
+00:00:00,219 --> 00:00:08,915
+Floor-Plan Studio. Open the seeded property, or upload any floor plan for AI vision ingestion.
 
 2
-00:00:04,632 --> 00:00:09,525
-The review. The plan is a live SVG shape object — every room and wall is a selectable node. Header chips carry the rent story: $900 baseline → $1,260/wk (+$360).
+00:00:08,915 --> 00:00:19,010
+The plan is a live shape object — every room and wall is selectable. The rent story: nine hundred a week baseline, twelve-sixty proposed.
 
 3
-00:00:09,525 --> 00:00:14,797
-DELTA VS ORIGINAL — a computed geometry diff, not a drawing: red dashed = removed (garage, lounge, balcony), green = added (Bed 4, Bed 5, ensuites, robes), amber = modified.
+00:00:19,010 --> 00:00:27,043
+Delta view — a computed geometry diff. Red removed, green added, amber modified.
 
 4
-00:00:14,797 --> 00:00:20,722
-Versions are immutable. v00 is the original 3-bed/1-bath plan. On the right: the change register — one git-style hunk per change, with rent impact and NSW advisory flags.
+00:00:27,043 --> 00:00:36,895
+Versions are immutable. Version zero is the original; every change is a git-style hunk with rent impact and compliance flags.
 
 5
-00:00:20,722 --> 00:00:25,098
-Selecting the STORE room, then shift-clicking the wall between living and kitchen. The red handles can trim a wall selection to the exact chunk where a window should go.
+00:00:36,895 --> 00:00:44,881
+Select the store room, then shift-click a wall. Drag the handles to pick an exact chunk.
 
 6
-00:00:25,098 --> 00:00:29,868
-One comment covers both targets: store becomes a STUDY + a servery window in the selected wall section. Comments queue locally — nothing sends until you press send.
+00:00:44,881 --> 00:00:53,793
+One comment covers both targets: make it a study, and cut a servery window. Changes queue locally.
 
 7
-00:00:29,868 --> 00:00:35,849
-Sent to the agent (Pydantic AI on DeepSeek). It answers with TYPED GEOMETRY OPS — validated before they land. The building envelope can never grow; bad edits bounce back.
+00:00:53,793 --> 00:01:03,144
+Send. The DeepSeek agent replies with typed, validated geometry operations — the building envelope can never grow.
 
 8
-00:00:35,849 --> 00:00:43,207
-The new version arrives over SSE: the store is now a STUDY with a servery window, and the agent re-estimated the weekly rent live — the header chips update in place.
+00:01:03,144 --> 00:01:12,872
+The new version arrives live: the study, the servery window, and a fresh rent estimate.
 
 9
-00:00:43,207 --> 00:00:47,506
-The new hunk joins the register — every +/− line traces to a geometry object, with NSW advisory flags. Any version exports as a styled PNG or SUMMARY.md.
+00:01:12,872 --> 00:01:23,490
+Every line in the new hunk traces to a geometry object. Export any version as a styled plan or summary.
 
 10
-00:00:47,506 --> 00:00:51,509
-Select → comment → send. The agent edits geometry, never pixels. github.com/nmp-dsci/floor-plan-reviewer
+00:01:23,490 --> 00:01:29,954
+Select, comment, send. The agent edits geometry — never pixels.

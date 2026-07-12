@@ -1,10 +1,13 @@
 # Floor-Plan Studio — demo walkthrough
 
-**Video:** `artifacts/walkthrough.mp4` (also `.webm`) — a real, unedited session recorded with
-Playwright against the local compose stack (`make -C app up`), including a live agent round-trip.
-**Narration is burned into the video** as a caption bar (subtitle-length versions of the scenes
-below), and `artifacts/walkthrough.srt` carries the same narration with measured timestamps for
-players that prefer toggleable subtitles. Stills referenced below are in `artifacts/`.
+**Video:** `artifacts/walkthrough.mp4` — a real, unedited session recorded with Playwright
+against the local compose stack (`make -C app up`), including a live agent round-trip.
+**The narration is spoken** (Deepgram Aura text-to-speech, Australian voice
+`aura-2-hyperion-en`) *and* burned in as the caption bar — one compact line per scene, timed so
+each scene holds while its line plays. `artifacts/walkthrough.srt` carries the same lines with
+measured timestamps; `artifacts/walkthrough.webm` is the silent cut. Without a
+`DEEPGRAM_API_KEY`, `make -C app demo` still works and produces the captions-only video.
+Stills referenced below are in `artifacts/`.
 
 **The one-liner:** load a property's floor plan as an interactive *shape object*, select the rooms
 and wall chunks you want changed, comment, and send — an AI agent edits the geometry through
