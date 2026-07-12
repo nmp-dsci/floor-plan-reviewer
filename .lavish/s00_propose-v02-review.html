@@ -1,0 +1,214 @@
+<title>231 Peats Ferry Rd — propose v03 review</title>
+<style>
+  :root {
+    --ink: #141416;
+    --paper: #ffffff;
+    --grey: #e1e1e3;
+    --grey-2: #f4f4f5;
+    --faint: #74747a;
+    --red: #e23d28;
+  }
+  * { box-sizing: border-box; min-width: 0; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 28px 20px 64px; }
+  header { border-bottom: 4px solid var(--ink); padding-bottom: 18px; margin-bottom: 18px; }
+  .kicker { font-size: 12px; letter-spacing: 0.22em; color: var(--faint); text-transform: uppercase; }
+  h1 { margin: 6px 0 2px; font-size: 26px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .sub { color: var(--faint); font-size: 14px; }
+  .rentline { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .stat {
+    border: 2px solid var(--ink); padding: 8px 14px; font-size: 13px;
+    text-transform: uppercase; letter-spacing: 0.08em; background: var(--paper);
+  }
+  .stat b { font-size: 17px; letter-spacing: 0; }
+  .stat.now { background: var(--ink); color: var(--paper); }
+  .stat.up b { color: var(--red); }
+  .stat.now.up b { color: #ff8a75; }
+  .howto {
+    margin: 16px 0 22px; padding: 10px 14px; background: var(--grey-2);
+    border-left: 4px solid var(--red); font-size: 14px;
+  }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 22px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  .card { border: 3px solid var(--ink); background: var(--paper); }
+  .card h2 {
+    margin: 0; padding: 10px 14px; font-size: 13px; letter-spacing: 0.18em;
+    text-transform: uppercase; border-bottom: 3px solid var(--ink);
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  }
+  .card h2 small { color: var(--faint); letter-spacing: 0.04em; font-weight: 400; text-transform: none; }
+  .card .body { padding: 14px; }
+  .card.flag { border-color: var(--red); }
+  .card.flag h2 { border-color: var(--red); color: var(--red); }
+  .planwrap { position: relative; margin: 0; }
+  .planwrap img { display: block; width: 100%; height: auto; }
+  .hotspot { position: absolute; border: 2px dashed transparent; }
+  .hotspot:hover { border-color: var(--red); background: rgba(226, 61, 40, 0.08); }
+  .hotspot::after {
+    content: attr(data-room); position: absolute; left: 4px; top: 2px;
+    font-size: 10px; letter-spacing: 0.1em; color: var(--red);
+    opacity: 0; text-transform: uppercase; pointer-events: none;
+  }
+  .hotspot:hover::after { opacity: 1; }
+  .side img { display: block; width: 100%; height: auto; }
+  .side .card + .card { margin-top: 22px; }
+  ul.changes { margin: 0; padding: 0; list-style: none; }
+  ul.changes li { padding: 10px 0; border-bottom: 1px solid var(--grey); font-size: 14px; }
+  ul.changes li:last-child { border-bottom: 0; }
+  ul.changes .cid { font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; }
+  ul.changes .impact { float: right; font-weight: 700; color: var(--red); }
+  ul.changes .flags { color: var(--faint); font-size: 12.5px; margin-top: 3px; }
+  .decision { margin-top: 26px; }
+  .decision .body { display: grid; gap: 10px; }
+  .decision label {
+    display: flex; gap: 10px; align-items: flex-start; border: 2px solid var(--grey);
+    padding: 12px 14px; cursor: pointer; font-size: 14px;
+  }
+  .decision label:hover { border-color: var(--ink); }
+  .decision input { margin-top: 3px; accent-color: var(--red); }
+  .decision .opt b { display: block; text-transform: uppercase; letter-spacing: 0.08em; font-size: 12.5px; }
+  .decision .opt span { color: var(--faint); font-size: 13px; }
+  .decision button {
+    justify-self: start; border: 3px solid var(--ink); background: var(--ink); color: var(--paper);
+    font: inherit; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    font-size: 13px; padding: 10px 18px; cursor: pointer;
+  }
+  .decision button:hover { background: var(--red); border-color: var(--red); }
+  .queued { font-size: 12.5px; color: var(--faint); }
+  footer { margin-top: 34px; font-size: 12px; color: var(--faint); text-align: center; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="kicker">floor-plan-reviewer · review surface</div>
+    <h1>231 Peats Ferry Road, Hornsby — Propose v03</h1>
+    <div class="sub">Owner-directed composite: lounge → Bed 5 · Bed 1 second master (hall absorbed) ·
+      Bed 2 WIR · L-bath + 2nd WC · butler's pantry, island + cabinetry · entry drawn external ·
+      baseline corrected to $900</div>
+    <div class="rentline">
+      <div class="stat">Baseline <b>$900/wk</b><br>owner-advised</div>
+      <div class="stat">v01 <b>$1,000/wk</b><br>4 bed · 2 bath</div>
+      <div class="stat">v02 <b>$1,040/wk</b><br>open-plan living</div>
+      <div class="stat now up">v03 <b>$1,260/wk</b><br>5 bed · 3 bath · 2 masters</div>
+      <div class="stat up">Cumulative <b>+$360/wk</b><br>vs baseline</div>
+    </div>
+  </header>
+
+  <div class="howto">
+    <b>How to review:</b> click any room on the plan (or any text) to annotate it. Queue a decision at
+    the bottom, then press <b>Send to Agent</b> — I’ll apply, re-render, and update this page.
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Proposed plan (v03) <small>styled redraw — annotate rooms directly</small></h2>
+      <figure class="planwrap" id="styled-plan">
+        <img src="propose_v03_plan.png?v=dims" alt="Proposed floor plan v03, styled redraw — dimensions on every room" />
+        <div class="hotspot" id="room-bed-4-0" data-room="BED 4" title="BED 4" aria-label="Room: BED 4" style="left:5.84%;top:3.53%;width:21.90%;height:20.31%"></div>
+        <div class="hotspot" id="room-walk-in-robe-1" data-room="WALK-IN ROBE" title="WALK-IN ROBE" aria-label="Room: WALK-IN ROBE" style="left:5.84%;top:23.84%;width:21.90%;height:7.95%"></div>
+        <div class="hotspot" id="room-ensuite-2" data-room="ENSUITE" title="ENSUITE" aria-label="Room: ENSUITE" style="left:5.84%;top:31.79%;width:21.90%;height:8.83%"></div>
+        <div class="hotspot" id="room-store-3" data-room="STORE" title="STORE" aria-label="Room: STORE" style="left:5.84%;top:40.62%;width:21.90%;height:10.15%"></div>
+        <div class="hotspot" id="room-living-4" data-room="LIVING" title="LIVING" aria-label="Room: LIVING" style="left:28.47%;top:3.53%;width:52.55%;height:13.02%"></div>
+        <div class="hotspot" id="room-l-dry-5" data-room="L'DRY" title="L'DRY" aria-label="Room: L'DRY" style="left:81.75%;top:3.53%;width:12.41%;height:13.02%"></div>
+        <div class="hotspot" id="room-dining-6" data-room="DINING" title="DINING" aria-label="Room: DINING" style="left:28.47%;top:17.00%;width:19.34%;height:13.69%"></div>
+        <div class="hotspot" id="room-kitchen-dining-7" data-room="KITCHEN/DINING" title="KITCHEN/DINING" aria-label="Room: KITCHEN/DINING" style="left:48.54%;top:17.00%;width:45.62%;height:12.14%"></div>
+        <div class="hotspot" id="room-pantry-8" data-room="PANTRY" title="PANTRY" aria-label="Room: PANTRY" style="left:82.85%;top:17.22%;width:11.31%;height:5.52%"></div>
+        <div class="hotspot" id="room-bed-5-9" data-room="BED 5" title="BED 5" aria-label="Room: BED 5" style="left:28.47%;top:31.13%;width:29.20%;height:19.21%"></div>
+        <div class="hotspot" id="room-hall-10" data-room="HALL" title="HALL" aria-label="Room: HALL" style="left:58.39%;top:29.58%;width:13.14%;height:28.92%"></div>
+        <div class="hotspot" id="room-bath-11" data-room="BATH" title="BATH" aria-label="Room: BATH" style="left:72.26%;top:29.58%;width:21.90%;height:7.95%"></div>
+        <div class="hotspot" id="room-wc-12" data-room="WC" title="WC" aria-label="Room: WC" style="left:72.26%;top:37.75%;width:10.95%;height:3.97%"></div>
+        <div class="hotspot" id="room-wc-13" data-room="WC" title="WC" aria-label="Room: WC" style="left:83.94%;top:37.75%;width:10.22%;height:3.97%"></div>
+        <div class="hotspot" id="room-bed-3-14" data-room="BED 3" title="BED 3" aria-label="Room: BED 3" style="left:72.26%;top:42.16%;width:21.90%;height:13.25%"></div>
+        <div class="hotspot" id="room-bir-15" data-room="BIR" title="BIR" aria-label="Room: BIR" style="left:72.26%;top:55.85%;width:10.22%;height:2.65%"></div>
+        <div class="hotspot" id="room-bir-16" data-room="BIR" title="BIR" aria-label="Room: BIR" style="left:83.21%;top:55.85%;width:10.95%;height:2.65%"></div>
+        <div class="hotspot" id="room-bed-2-17" data-room="BED 2" title="BED 2" aria-label="Room: BED 2" style="left:68.61%;top:58.94%;width:25.55%;height:16.11%"></div>
+        <div class="hotspot" id="room-wir-18" data-room="WIR" title="WIR" aria-label="Room: WIR" style="left:68.98%;top:69.54%;width:8.76%;height:5.30%"></div>
+        <div class="hotspot" id="room-entry-19" data-room="ENTRY" title="ENTRY" aria-label="Room: ENTRY" style="left:32.85%;top:50.77%;width:13.87%;height:12.36%"></div>
+        <div class="hotspot" id="room-porch-20" data-room="PORCH" title="PORCH" aria-label="Room: PORCH" style="left:32.85%;top:63.58%;width:13.87%;height:10.15%"></div>
+        <div class="hotspot" id="room-hall-21" data-room="HALL" title="HALL" aria-label="Room: HALL" style="left:47.45%;top:50.99%;width:10.22%;height:7.95%"></div>
+        <div class="hotspot" id="room-bed-1-22" data-room="BED 1" title="BED 1" aria-label="Room: BED 1" style="left:46.72%;top:59.38%;width:21.17%;height:13.69%"></div>
+        <div class="hotspot" id="room-ensuite-23" data-room="ENSUITE" title="ENSUITE" aria-label="Room: ENSUITE" style="left:46.72%;top:73.51%;width:11.68%;height:8.83%"></div>
+        <div class="hotspot" id="room-wir-24" data-room="WIR" title="WIR" aria-label="Room: WIR" style="left:59.12%;top:73.51%;width:8.76%;height:8.83%"></div>
+      </figure>
+    </div>
+
+    <div class="side">
+      <div class="card flag">
+        <h2>Interpretation check</h2>
+        <div class="body" id="ws-interpretation" style="font-size:14px">
+          Your note <i>“add a WS behind the current WS, bath is L shape”</i> was built as a
+          <b>second WC/shower pocket east of the existing WC, entered from the bathroom</b> (making
+          the wet zone L-shaped). If WS meant something else — double vanity, wash station — annotate
+          this card and I’ll redraw it.
+        </div>
+      </div>
+      <div class="card">
+        <h2>Delta view <small>all changes on the listing plan</small></h2>
+        <div class="body"><img src="propose_v03.png" alt="Red-box delta overlay for v03" /></div>
+      </div>
+      <div class="card">
+        <h2>Original <small>as listed — untouched reference</small></h2>
+        <div class="body"><img src="original.png" alt="Original listing floor plan" /></div>
+      </div>
+      <div class="card">
+        <h2>Change register</h2>
+        <div class="body">
+          <ul class="changes">
+            <li id="change-c01"><span class="impact">+$100/wk</span><span class="cid">c01 · v01</span> — Garage → Bed 4 + WIR + ensuite
+              <div class="flags">DA likely · new street windows · slab · remote drainage</div></li>
+            <li id="change-c02"><span class="impact">+$40/wk</span><span class="cid">c02 · v02</span> — Balcony → living, open plan
+              <div class="flags">Structural engineer first · waterproofing · borrowed light</div></li>
+            <li id="change-c03"><span class="impact">+$120/wk</span><span class="cid">c03 · v03</span> — Lounge → Bed 5 (hall strip retained)
+              <div class="flags">Exempt-level · smoke alarms</div></li>
+            <li id="change-c04"><span class="impact">+$60/wk</span><span class="cid">c04 · v03</span> — Bed 1 second master: ensuite + WIR, hall absorbed
+              <div class="flags">CDC plausible · south drainage run · linen lost</div></li>
+            <li id="change-c05"><span class="impact">+$5/wk</span><span class="cid">c05 · v03</span> — Bed 2 corner walk-in robe
+              <div class="flags">Joinery — exempt</div></li>
+            <li id="change-c06"><span class="impact">+$15/wk</span><span class="cid">c06 · v03</span> — L-bath + second WC
+              <div class="flags">On the east wet stack · CDC + waterproofing</div></li>
+            <li id="change-c07"><span class="impact">+$20/wk</span><span class="cid">c07 · v03</span> — Butler's pantry · island · cabinetry · laundry outside access
+              <div class="flags">Joinery — exempt</div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card decision">
+    <h2>Next step <small>queues one instruction — nothing sends until you press Send to Agent</small></h2>
+    <form class="body" data-lavish-question="next-step"
+      onsubmit="event.preventDefault();
+        const v = new FormData(event.currentTarget).get('next');
+        if (!v) return;
+        const prompts = {
+          revise: 'Revise v03 using my annotations on this page; re-render both views and update the page.',
+          accept: 'Accept v03, stop iterating, and write SUMMARY.md for 231-peats-ferry-rd.',
+          dualocc: 'Widen scope to explore dual-occupancy: re-confirm scope.md, then propose v04 splitting the home into two self-contained tenancies (dual street access) with a combined rent estimate from live comps.'
+        };
+        window.lavish.queuePrompt(prompts[v], { tag: 'choice', text: 'Next step: ' + v,
+          element: event.currentTarget, queueKey: 'next-step',
+          data: { question: 'next-step', answer: v } });
+        document.getElementById('queued-note').textContent =
+          'Queued: ' + v + ' — press Send to Agent when ready (annotations travel with it).';">
+      <label><input type="radio" name="next" value="revise" />
+        <span class="opt"><b>Revise v03</b><span>Apply my room annotations on this page, re-render, show me again.</span></span></label>
+      <label><input type="radio" name="next" value="accept" />
+        <span class="opt"><b>Accept &amp; summarise</b><span>Freeze at v03 ($1,260/wk, +$360) and write SUMMARY.md with the full journey and evidence.</span></span></label>
+      <label><input type="radio" name="next" value="dualocc" />
+        <span class="opt"><b>Explore dual-occupancy (scope change)</b><span>The 778 m² block has dual street access — v04 could split into two tenancies for combined rent. Requires re-confirming scope.md.</span></span></label>
+      <button type="submit">Queue this answer</button>
+      <div class="queued" id="queued-note">Nothing queued yet.</div>
+    </form>
+  </div>
+
+  <footer>
+    Rent figures from live comparables accessed 2026-07-12 (see propose_v03.md) · Baseline $900/wk owner-advised ·
+    Scale in metres, indicative only · Concept proposal — not architectural, planning, or financial advice.
+  </footer>
+</div>

@@ -1,0 +1,119 @@
+{
+  "version": 3,
+  "property": "231-peats-ferry-rd",
+  "base_image": "original.png",
+  "changes": [
+    {
+      "id": "c01",
+      "added_in_version": 1,
+      "kind": "convert",
+      "title": "Tandem garage → Bedroom 4 + walk-in robe + ensuite",
+      "rationale": "Largest single lever: 32.4 m² of room-sized, street-fronting floor area. Moves the property from the 3b/1b comp pool into the 4b/2b pool in one step.",
+      "rent_impact_per_week": 100,
+      "compliance": {
+        "pathway": "DA",
+        "notes": [
+          "Change of use garage → habitable + loss of covered parking (Hornsby DCP) — DA likely, CDC possible if Housing Code criteria met",
+          "Habitable room: ≥2.4 m ceiling, natural light ~10% / ventilation ~5% of floor area — new street-facing window(s)",
+          "Slab floor level, damp-proofing and insulation (BASIX) to habitable standard",
+          "Ensuite drainage is a new run remote from the east wet stack — hydraulic advice"
+        ]
+      },
+      "boxes": [
+        { "x": 45, "y": 64, "w": 166, "h": 380, "label": "Bed 4" },
+        { "x": 57, "y": 274, "w": 102, "h": 166, "label": "walk-in robe" },
+        { "x": 48, "y": 446, "w": 160, "h": 74, "label": "ensuite" }
+      ]
+    },
+    {
+      "id": "c02",
+      "added_in_version": 2,
+      "kind": "convert",
+      "title": "Enclose balcony (7.5 × 2.9 m) → new living area, opened to kitchen/dining",
+      "rationale": "Banks 21.8 m² under the existing roofline and replaces the living amenity that the Bed 5 conversion takes.",
+      "rent_impact_per_week": 40,
+      "compliance": {
+        "pathway": "specialist",
+        "notes": [
+          "Opening the former external wall between balcony and kitchen/dining is structural — engineer first; pathway likely CDC/DA once engineered",
+          "Former balcony floor: waterproofing, floor level and insulation; balustrade edge becomes glazed external wall (BASIX)",
+          "Dining/kitchen borrow light through the enclosed zone — re-check light/ventilation ratios",
+          "External stair off the balcony is absorbed — retain/relocate yard access and check egress"
+        ]
+      },
+      "boxes": [
+        { "x": 212, "y": 64, "w": 396, "h": 148, "label": "enclose balcony\nnew living area" },
+        { "x": 212, "y": 212, "w": 396, "h": 34, "label": "remove wall — open plan (structural)", "style": "outline" }
+      ]
+    },
+    {
+      "id": "c03",
+      "added_in_version": 3,
+      "kind": "repurpose",
+      "title": "Lounge → Bedroom 5 (hall strip retained on its east side)",
+      "rationale": "With the enclosed balcony providing living space, the 22.4 m² lounge converts to a large 5th bedroom, jumping into the 5-bed comp band; a 1.0 m hall strip keeps circulation from the entry landing to the living zone.",
+      "rent_impact_per_week": 120,
+      "compliance": {
+        "pathway": "exempt",
+        "notes": [
+          "Non-structural partition + door; existing windows satisfy light/ventilation",
+          "Confirm smoke-alarm layout for the extra bedroom (NSW residential requirement)"
+        ]
+      },
+      "boxes": [
+        { "x": 214, "y": 402, "w": 274, "h": 236, "label": "Bed 5\n(hall strip retained east)" }
+      ]
+    },
+    {
+      "id": "c04",
+      "added_in_version": 3,
+      "kind": "new_wet_area",
+      "title": "Bed 1 → second master: hall absorbed, ensuite + walk-in robe added",
+      "rationale": "Owner-directed: central hall folds into the Bed 1 suite (compact landing retained); ensuite + WIR across the south end give the house two master bedrooms — a strong differentiator vs 5-bed comps with 2 baths.",
+      "rent_impact_per_week": 60,
+      "compliance": {
+        "pathway": "CDC",
+        "notes": [
+          "New ensuite drainage at the south end — new run, hydraulic advice",
+          "Hall linen storage is lost — flagged as amenity trade-off",
+          "Internal partitions non-structural (verify before removal)"
+        ]
+      },
+      "boxes": [
+        { "x": 352, "y": 647, "w": 180, "h": 148, "label": "landing rework —\nhall → Bed 1 suite", "style": "outline" },
+        { "x": 350, "y": 926, "w": 185, "h": 109, "label": "ensuite + WIR" }
+      ]
+    },
+    {
+      "id": "c05",
+      "added_in_version": 3,
+      "kind": "repurpose",
+      "title": "Bed 2: corner walk-in robe",
+      "rationale": "Owner-directed: Bed 1 and Bed 2 both get walk-in access; Bed 2 gains a corner WIR.",
+      "rent_impact_per_week": 5,
+      "compliance": { "pathway": "exempt", "notes": ["Joinery/partition only"] },
+      "boxes": [ { "x": 492, "y": 855, "w": 75, "h": 85, "label": "WIR" } ]
+    },
+    {
+      "id": "c06",
+      "added_in_version": 3,
+      "kind": "new_wet_area",
+      "title": "Main bath goes L-shaped with a second WC pocket behind the existing WC",
+      "rationale": "Owner-directed ('add a WS behind the current WS, bath is L shape' — interpreted as a second WC/shower pocket entered from the bath; flag if wrong). Two WCs + 3 baths suits a 5-bed household.",
+      "rent_impact_per_week": 15,
+      "compliance": { "pathway": "CDC", "notes": ["Within the existing east wet stack — cheapest wet work in the house", "Waterproofing certification"] },
+      "boxes": [ { "x": 600, "y": 478, "w": 105, "h": 55, "label": "L bath + 2nd WC", "style": "outline" } ]
+    },
+    {
+      "id": "c07",
+      "added_in_version": 3,
+      "kind": "repurpose",
+      "title": "Kitchen: butler's pantry on the laundry wall, island bench, full cabinetry run; laundry door at the living end for outside access",
+      "rationale": "Owner-directed: professional-feel kitchen — butler's pantry against the laundry wall, island bench in front of it, cabinetry along that wall; laundry opens off the living end for direct outside access.",
+      "rent_impact_per_week": 20,
+      "compliance": { "pathway": "exempt", "notes": ["Joinery + internal door; laundry external access uses existing external door position"] },
+      "boxes": [ { "x": 365, "y": 232, "w": 335, "h": 146, "label": "butler's pantry · island · cabinetry", "style": "outline" } ]
+    }
+  ],
+  "rent": { "currency": "AUD", "baseline_per_week": 900, "proposed_per_week": 1260 }
+}

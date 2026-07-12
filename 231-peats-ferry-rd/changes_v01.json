@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "property": "231-peats-ferry-rd",
+  "base_image": "original.png",
+  "changes": [
+    {
+      "id": "c01",
+      "added_in_version": 1,
+      "kind": "convert",
+      "title": "Tandem garage → Bedroom 4 + walk-in robe + ensuite",
+      "rationale": "Largest single lever: 32.4 m² of room-sized, street-fronting floor area. Moves the property from the 3b/1b comp pool into the 4b/2b pool in one step; the second bathroom alone carries roughly a +$100/wk premium locally.",
+      "rent_impact_per_week": 150,
+      "compliance": {
+        "pathway": "DA",
+        "notes": [
+          "Change of use garage → habitable + loss of covered parking (Hornsby DCP) — DA likely, CDC possible if Housing Code criteria met",
+          "Habitable room: ≥2.4 m ceiling, natural light ~10% / ventilation ~5% of floor area — new street-facing window(s)",
+          "Slab floor level, damp-proofing and insulation (BASIX) to habitable standard",
+          "Ensuite drainage is a new run remote from the east wet stack — hydraulic advice"
+        ]
+      },
+      "boxes": [
+        { "x": 45, "y": 64, "w": 166, "h": 380, "label": "Bed 4" },
+        { "x": 57, "y": 274, "w": 102, "h": 166, "label": "walk-in robe" },
+        { "x": 48, "y": 446, "w": 160, "h": 74, "label": "ensuite" }
+      ]
+    }
+  ],
+  "rent": { "currency": "AUD", "baseline_per_week": 850, "proposed_per_week": 1000 }
+}

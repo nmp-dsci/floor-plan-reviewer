@@ -1,0 +1,593 @@
+<title>Floor-Plan Studio — web app build plan</title>
+<style>
+  :root {
+    --ink: #141416;
+    --paper: #ffffff;
+    --grey: #e1e1e3;
+    --grey-2: #f4f4f5;
+    --faint: #74747a;
+    --red: #e23d28;
+    --green: #1a7f37;
+    --green-bg: #e6f4ea;
+    --red-bg: #fdecea;
+    --mono: "SF Mono", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; min-width: 0; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+    font-family: "Helvetica Neue", Arial, sans-serif; line-height: 1.5; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 28px 20px 64px; }
+  header { border-bottom: 4px solid var(--ink); padding-bottom: 18px; margin-bottom: 18px; }
+  .kicker { font-size: 12px; letter-spacing: 0.22em; color: var(--faint); text-transform: uppercase; }
+  h1 { margin: 6px 0 2px; font-size: 26px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .sub { color: var(--faint); font-size: 14px; max-width: 900px; }
+  .rentline { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .stat { border: 2px solid var(--ink); padding: 8px 14px; font-size: 13px;
+    text-transform: uppercase; letter-spacing: 0.08em; background: var(--paper); }
+  .stat b { font-size: 17px; letter-spacing: 0; }
+  .stat.now { background: var(--ink); color: var(--paper); }
+  .howto { margin: 16px 0 22px; padding: 10px 14px; background: var(--grey-2);
+    border-left: 4px solid var(--red); font-size: 14px; }
+  section.card { border: 3px solid var(--ink); background: var(--paper); margin-top: 26px; }
+  section.card > h2 { margin: 0; padding: 10px 14px; font-size: 13px; letter-spacing: 0.18em;
+    text-transform: uppercase; border-bottom: 3px solid var(--ink);
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  section.card > h2 small { color: var(--faint); letter-spacing: 0.04em; font-weight: 400; text-transform: none; }
+  .body { padding: 16px; }
+  .body h3 { margin: 18px 0 6px; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; }
+  .body h3:first-child { margin-top: 0; }
+  .body p { margin: 6px 0; font-size: 14.5px; }
+  .body ul { margin: 6px 0; padding-left: 20px; font-size: 14.5px; }
+  .body li { margin: 3px 0; }
+  .cols2 { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 20px; }
+  @media (max-width: 900px) { .cols2 { grid-template-columns: minmax(0,1fr); } }
+  table.spec { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  table.spec th { text-align: left; font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    border-bottom: 2px solid var(--ink); padding: 6px 10px 6px 0; }
+  table.spec td { border-bottom: 1px solid var(--grey); padding: 7px 10px 7px 0; vertical-align: top; }
+  table.spec td:first-child { white-space: nowrap; font-weight: 700; }
+  code, pre { font-family: var(--mono); font-size: 12.5px; }
+  pre { background: var(--grey-2); border: 1px solid var(--grey); padding: 12px; overflow-x: auto; margin: 8px 0; }
+  pre.diff { background: #fff; border: 1px solid var(--grey); line-height: 1.55; }
+  pre.diff .h { color: var(--faint); }
+  pre.diff .add { display: block; background: var(--green-bg); color: var(--green); }
+  pre.diff .del { display: block; background: var(--red-bg); color: var(--red); }
+  .mermaid { background: var(--paper); padding: 8px 0; overflow-x: auto; }
+  .pill { display: inline-block; border: 1.5px solid var(--ink); padding: 1px 8px; font-size: 11.5px;
+    letter-spacing: 0.08em; text-transform: uppercase; margin: 0 4px 4px 0; }
+  .pill.red { border-color: var(--red); color: var(--red); }
+  .pill.green { border-color: var(--green); color: var(--green); }
+  /* UI mock */
+  .mock { border: 2px solid var(--ink); }
+  .mock-head { border-bottom: 2px solid var(--ink); padding: 10px 12px; }
+  .mock-head .t { font-weight: 700; letter-spacing: 0.06em; font-size: 14px; text-transform: uppercase; }
+  .mock-stats { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .mock-stats span { border: 1.5px solid var(--ink); font-size: 10.5px; padding: 3px 7px;
+    text-transform: uppercase; letter-spacing: 0.06em; }
+  .mock-stats span.now { background: var(--ink); color: var(--paper); }
+  .mock-grid { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr); }
+  @media (max-width: 760px) { .mock-grid { grid-template-columns: minmax(0,1fr); } }
+  .mock-canvas { padding: 10px; border-right: 2px solid var(--ink); }
+  @media (max-width: 760px) { .mock-canvas { border-right: 0; border-bottom: 2px solid var(--ink); } }
+  .mock-canvas svg { display: block; width: 100%; height: auto; }
+  .mock-rail { padding: 10px 12px; font-size: 12.5px; }
+  .mock-rail h4 { margin: 8px 0 4px; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; }
+  .mock-rail h4:first-child { margin-top: 0; }
+  .qitem { border: 1.5px solid var(--grey); padding: 6px 8px; margin: 4px 0; }
+  .qitem b { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .qitem .chips { margin-top: 2px; }
+  .qitem .chips i { font-style: normal; border: 1px solid var(--red); color: var(--red);
+    font-size: 10px; padding: 0 5px; margin-right: 4px; text-transform: uppercase; }
+  .mock-send { display: inline-block; background: var(--ink); color: var(--paper); font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; font-size: 11px; padding: 7px 12px; margin-top: 8px; }
+  /* decision forms */
+  .decision .dbody { display: grid; gap: 10px; padding: 14px 16px 16px; }
+  .decision label { display: flex; gap: 10px; align-items: flex-start; border: 2px solid var(--grey);
+    padding: 10px 12px; cursor: pointer; font-size: 14px; }
+  .decision label:hover { border-color: var(--ink); }
+  .decision input { margin-top: 3px; accent-color: var(--red); }
+  .decision .opt b { display: block; text-transform: uppercase; letter-spacing: 0.08em; font-size: 12.5px; }
+  .decision .opt span { color: var(--faint); font-size: 13px; }
+  .decision button { justify-self: start; border: 3px solid var(--ink); background: var(--ink);
+    color: var(--paper); font: inherit; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; font-size: 12px; padding: 8px 14px; cursor: pointer; }
+  .decision button:hover { background: var(--red); border-color: var(--red); }
+  .queued { font-size: 12.5px; color: var(--faint); }
+  footer { margin-top: 34px; font-size: 12px; color: var(--faint); text-align: center; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="kicker">floor-plan-reviewer · build plan for review</div>
+    <h1>Floor-Plan Studio — Web App Plan</h1>
+    <div class="sub">A local-first web app that turns the chat/lavish review loop you just used on
+      231 Peats Ferry Rd into a product: load a floor plan, see the proposed plan as an interactive
+      <b>shape object</b> (d3 + SVG), select rooms and wall chunks, queue comments, send them to the
+      agent, and watch the plan, delta view, and a git-style change register update — version after
+      version. Built to deploy to AWS later exactly like <code>data-qa-agent</code>.</div>
+    <div class="rentline">
+      <div class="stat">Decision <b>approve plan</b><br>before any code</div>
+      <div class="stat">Shape <b>3 services</b><br>+ Postgres, like data-qa-agent</div>
+      <div class="stat now">Local first <b>make up</b><br>every phase runnable</div>
+      <div class="stat">Later <b>AWS</b><br>App Runner + Terraform</div>
+    </div>
+  </header>
+
+  <div class="howto">
+    <b>How to review:</b> annotate any paragraph, diagram, mock, or table. Lock the four decisions at
+    the bottom (each has its own queue button), then press <b>Send to Agent</b>. Once locked, this
+    plan gets saved into the repo and Phase 0 starts.
+  </div>
+
+  <section class="card">
+    <h2>Goal, current state, target behaviour</h2>
+    <div class="body">
+      <div class="cols2">
+        <div>
+          <h3>Current state (what exists today)</h3>
+          <ul>
+            <li><b>Geometry already drives everything:</b> <code>plan_v##.json</code> holds rooms as
+              metre-rectangles + openings + fixtures; <code>scripts/render_plan.py</code> (Pillow)
+              draws the styled plan; <code>changes_v##.json</code> drives the red-box delta overlay.</li>
+            <li><b>The review loop works but is stitched together:</b> chat + lavish pages with
+              hand-generated PNG hotspots; walls aren't objects — you can't select "this chunk of
+              wall" today.</li>
+            <li><b>Sibling reference:</b> <code>data-qa-agent</code> proves the target shape —
+              React+Vite frontend, FastAPI backend, Pydantic AI agent service, Postgres,
+              <code>make up</code> locally, AWS App Runner + Terraform + GitHub Actions deploy.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Target behaviour (what the app does)</h3>
+          <ul>
+            <li>User <b>loads or selects</b> a floor plan → app shows the <b>Proposed plan</b> as an
+              interactive SVG rendered from geometry (not a PNG).</li>
+            <li><b>Delta view</b> = computed diff of original vs proposed geometry: additions green,
+              removals red; <b>change register rendered like a git diff</b>.</li>
+            <li>User selects <b>rooms</b> and <b>walls — whole or a chunk</b> (to remove, or add a
+              door/window), <b>long-press to multi-select</b> when a change spans objects.</li>
+            <li>Comments accumulate in a <b>change list</b> → <b>Send</b> → agent actions them →
+              new version → whole app updates (headline stats on top, details below — the exact
+              look and feel of the s00 review page).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>The screen <small>static mock — annotate anything that looks wrong</small></h2>
+    <div class="body">
+      <div class="mock">
+        <div class="mock-head">
+          <div class="t">231 Peats Ferry Road, Hornsby — Propose v03</div>
+          <div class="mock-stats">
+            <span>Baseline $900/wk</span><span>v01 $1,000</span><span>v02 $1,040</span>
+            <span class="now">v03 $1,260/wk</span><span>+$360/wk</span>
+          </div>
+        </div>
+        <div class="mock-grid">
+          <div class="mock-canvas">
+            <svg viewBox="0 0 460 300" role="img" aria-label="Mock of the interactive plan canvas">
+              <rect x="8" y="8" width="444" height="284" fill="#fff" stroke="#141416" stroke-width="6"/>
+              <!-- rooms -->
+              <rect x="14" y="14" width="120" height="150" fill="#fff" stroke="#141416" stroke-width="4"/>
+              <text x="74" y="80" font-size="13" font-weight="700" text-anchor="middle" font-family="Arial">BED 4</text>
+              <text x="74" y="96" font-size="10" text-anchor="middle" font-family="Arial" fill="#74747a">3.0 x 4.6m</text>
+              <!-- selected room -->
+              <rect x="140" y="14" width="180" height="110" fill="rgba(226,61,40,0.07)" stroke="#e23d28" stroke-width="3" stroke-dasharray="7 4"/>
+              <text x="230" y="62" font-size="13" font-weight="700" text-anchor="middle" font-family="Arial" fill="#e23d28">LIVING ✓</text>
+              <text x="230" y="78" font-size="10" text-anchor="middle" font-family="Arial" fill="#74747a">7.5 x 2.9m</text>
+              <rect x="326" y="14" width="120" height="110" fill="#fff" stroke="#141416" stroke-width="4"/>
+              <text x="386" y="62" font-size="13" font-weight="700" text-anchor="middle" font-family="Arial">L'DRY</text>
+              <rect x="140" y="130" width="306" height="156" fill="#fff" stroke="#141416" stroke-width="4"/>
+              <text x="293" y="200" font-size="13" font-weight="700" text-anchor="middle" font-family="Arial">KITCHEN/DINING</text>
+              <!-- selected wall CHUNK on the shared wall, with handles -->
+              <line x1="140" y1="127" x2="446" y2="127" stroke="#141416" stroke-width="6"/>
+              <line x1="210" y1="127" x2="300" y2="127" stroke="#e23d28" stroke-width="10" stroke-linecap="round"/>
+              <circle cx="210" cy="127" r="6" fill="#fff" stroke="#e23d28" stroke-width="3"/>
+              <circle cx="300" cy="127" r="6" fill="#fff" stroke="#e23d28" stroke-width="3"/>
+              <!-- comment popover -->
+              <g font-family="Arial">
+                <rect x="196" y="140" width="204" height="44" fill="#fff" stroke="#141416" stroke-width="2.5"/>
+                <text x="206" y="157" font-size="10.5" fill="#74747a">2 objects: LIVING · wall chunk (2.1m)</text>
+                <text x="206" y="174" font-size="11.5" font-weight="700">“open this wall — servery window” ▸ add</text>
+              </g>
+            </svg>
+          </div>
+          <div class="mock-rail">
+            <h4>Change list (queued)</h4>
+            <div class="qitem"><b>q1</b> — “open this wall — servery window”
+              <div class="chips"><i>living</i><i>wall w-living-kitchen · 0.32–0.61</i></div></div>
+            <div class="qitem"><b>q2</b> — “swap ensuite and robe”
+              <div class="chips"><i>ensuite-1</i><i>wir-1</i></div></div>
+            <span class="mock-send">Send 2 changes to agent</span>
+            <h4>Change register (git-style)</h4>
+            <pre class="diff" style="margin:0"><span class="h">@@ c08 · servery to kitchen        +$0/wk @@</span>
+<span class="del">- wall  living/kitchen  t 0.32–0.61  solid</span>
+<span class="add">+ open  living↔kitchen  2.1m  window (servery)</span></pre>
+          </div>
+        </div>
+      </div>
+      <p style="color:var(--faint);font-size:13px;margin-top:10px">Same skeleton as the s00 review
+        page: headline + stat chips on top, plan canvas left, delta/register/comments rail right,
+        decisions at the bottom. The canvas is live SVG — every room polygon and wall segment is a
+        DOM node, so selection, hover, and diff colouring are native.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Core concept — the plan is a shape object</h2>
+    <div class="body">
+      <p>Everything hangs off one typed geometry model (“<b>plan schema v2</b>”), an evolution of
+        today's <code>plan_v##.json</code>. The load step converts a plan into objects with stable
+        ids; the app renders SVG from it; the agent edits it with validated operations; the diff
+        engine compares two of them. <b>Walls become first-class</b>: derived once from room
+        adjacency (shared rectangle edges → wall segments between junctions), then addressable.</p>
+      <div class="cols2">
+        <div>
+          <h3>Objects</h3>
+<pre>// room — as today, plus stable id + kind
+{ "id": "bed-5", "kind": "bedroom",
+  "name": "BED 5", "x": 3.1, "y": 6.25,
+  "w": 4.0, "h": 4.35 }
+
+// wall — derived at load, then first-class
+{ "id": "w-bed5-hall-1",
+  "a": "bed-5", "b": "hall",        // or "exterior"
+  "line": [7.1, 6.25, 7.1, 10.6],   // metres
+  "t": 0.12,
+  "openings": [{ "id": "o-17", "type": "door",
+                 "t0": 0.42, "t1": 0.63 }] }</pre>
+        </div>
+        <div>
+          <h3>Selection &amp; comments</h3>
+<pre>// what a comment attaches to
+{ "targets": [
+    { "type": "room", "id": "living" },
+    { "type": "wall", "id": "w-living-kitchen-2",
+      "t0": 0.32, "t1": 0.61 }      // a CHUNK
+] }
+
+// queued change-list item
+{ "id": "q1", "targets": [ … ],
+  "text": "open this wall — servery window",
+  "status": "queued" }</pre>
+        </div>
+      </div>
+      <h3>Interaction spec</h3>
+      <table class="spec">
+        <tr><th>Gesture</th><th>Result</th></tr>
+        <tr><td>Click room</td><td>Select the room polygon.</td></tr>
+        <tr><td>Click wall</td><td>Select the whole segment (junction → junction). Walls get a fat invisible hit-stroke (~14px) so they're easy to grab.</td></tr>
+        <tr><td>Drag handles on a selected wall</td><td>Trim the selection to a <b>chunk</b> (<code>t0–t1</code>) — “remove this bit”, “door here”, “window here”.</td></tr>
+        <tr><td>Long-press (≥400 ms) then click</td><td>Multi-select mode: each click adds/removes an object (rooms and walls mix freely). <kbd>Shift</kbd>-click is the desktop equivalent.</td></tr>
+        <tr><td>With selection → type comment</td><td>Popover shows the target chips; <b>Add</b> pushes to the change list (nothing sent yet).</td></tr>
+        <tr><td><b>Send</b></td><td>Submits the queued list to the agent; app streams progress and swaps in the new version when ready.</td></tr>
+        <tr><td>Esc / click empty space</td><td>Clear selection.</td></tr>
+      </table>
+      <h3>Constraint (v1)</h3>
+      <p>Rooms are axis-aligned rectangles, walls are axis-aligned segments — same constraint the
+        Pillow renderer has today. Diagonal/curved geometry is explicitly out of scope for v1 and
+        listed under risks.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Diff engine &amp; git-style change register</h2>
+    <div class="body">
+      <p><b>Identity first:</b> ids are stable across versions (agent operations must reuse ids for
+        modified objects, mint new ones for additions). Diffing original → proposed is then object
+        set comparison: <span class="pill green">add</span> <span class="pill red">remove</span>
+        <span class="pill">modify</span> per room, wall, and opening.</p>
+      <div class="cols2">
+        <div>
+          <h3>Delta view (visual)</h3>
+          <ul>
+            <li>Proposed plan as the base drawing.</li>
+            <li><b>Added</b> walls/rooms: green stroke / light green fill.</li>
+            <li><b>Removed</b>: red dashed ghosts drawn where the old geometry was.</li>
+            <li><b>Modified</b> (repurposed room, resized): outlined with a “was → now” label,
+              e.g. <code>LOUNGE → BED 5</code>.</li>
+            <li>Toggle: <i>vs original</i> / <i>vs previous version</i>.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Register (rendered from the diff, not hand-written)</h3>
+<pre class="diff" style="margin:0"><span class="h">@@ c03 · lounge → bed 5                 +$120/wk @@</span>
+<span class="del">- room  lounge        5.2 x 4.3m   living</span>
+<span class="add">+ room  bed-5         4.0 x 4.3m   bedroom</span>
+<span class="add">+ wall  bed-5/hall    4.35m        partition</span>
+<span class="add">+ open  hall→bed-5    0.9m         door</span>
+<span class="h">@@ c04 · bed 1 second master             +$60/wk @@</span>
+<span class="del">- room  hall-central  2.4 x 1.7m</span>
+<span class="del">- room  linen         1.9 x 0.5m</span>
+<span class="add">+ room  ensuite-1     1.6 x 2.0m   wet</span>
+<span class="add">+ room  wir-1         1.2 x 2.0m</span></pre>
+        </div>
+      </div>
+      <p>Each hunk keeps the workflow's metadata: change id, title, rent impact, compliance flags —
+        so the register stays the same “paper trail” the repo files carry today, just rendered like
+        a diff.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Architecture <small>mirrors data-qa-agent so the AWS path is already proven</small></h2>
+    <div class="body">
+      <pre class="mermaid">
+graph TD
+  U["Browser — React + Vite + TS<br/>d3 SVG canvas · diff view · git-style register<br/>change list + send"]
+  A["backend-api — FastAPI<br/>plans · reviews · versions · comments<br/>SSE events"]
+  G["plan-agent — Pydantic AI + Claude<br/>vision ingest · apply-comments loop<br/>rent comps + compliance (later phase)"]
+  C["plan-core — shared Python lib<br/>schema v2 · wall derivation · diff engine<br/>validation · Pillow PNG export (reuses scripts/)"]
+  P[("Postgres<br/>plans · versions · comments · runs")]
+  S[("object store<br/>uploads · exported renders<br/>local: volume → AWS: S3")]
+  L["Claude API"]
+  U -->|"REST + SSE"| A
+  A -->|"job: apply comments"| G
+  G --> L
+  A --> C
+  G --> C
+  A --> P
+  A --> S
+      </pre>
+      <pre class="mermaid">
+sequenceDiagram
+  participant User
+  participant FE as frontend (d3 canvas)
+  participant API as backend-api
+  participant AG as plan-agent
+  User->>FE: select LIVING + wall chunk, type comment, Add
+  User->>FE: Send (2 queued changes)
+  FE->>API: POST /reviews/42/comments [q1, q2]
+  API->>AG: run job (head geometry + comments)
+  AG->>AG: plan ops via Claude, validate with plan-core
+  AG-->>API: new version vN+1 + diff + register + rent stats
+  API-->>FE: SSE version.ready
+  FE->>FE: re-render canvas, delta view, register, headline stats
+      </pre>
+      <h3>API surface (v1)</h3>
+      <table class="spec">
+        <tr><th>Endpoint</th><th>Purpose</th></tr>
+        <tr><td>POST /plans</td><td>Create a plan from upload (image) or geometry JSON; returns plan id.</td></tr>
+        <tr><td>POST /plans/{id}/ingest</td><td>Vision extraction job (image → schema-v2 draft) — Phase 4.</td></tr>
+        <tr><td>GET /reviews/{id}</td><td>Review state: original, head version, version list, register, rent stats.</td></tr>
+        <tr><td>POST /reviews/{id}/comments</td><td>Submit the queued change list (batch) → 202 + job id.</td></tr>
+        <tr><td>GET /reviews/{id}/versions/{n}</td><td>Geometry + diff-vs-original + register for version n.</td></tr>
+        <tr><td>GET /reviews/{id}/events</td><td>SSE: job progress, version.ready.</td></tr>
+        <tr><td>GET /reviews/{id}/versions/{n}/export.png</td><td>Server-side Pillow render — same output as the chat workflow.</td></tr>
+      </table>
+      <h3>Agent contract</h3>
+      <p>The agent never edits SVG or pixels. It emits <b>typed geometry operations</b>
+        (<code>split_room</code>, <code>merge_rooms</code>, <code>set_kind</code>,
+        <code>add_opening(wall, t0, t1, type)</code>, <code>remove_wall_chunk</code>,
+        <code>add_fixture</code>…) that <code>plan-core</code> validates (no orphan openings, no
+        overlapping rooms beyond wall tolerance, circulation reachability check) and applies.
+        Invalid ops bounce back to the agent with the validator's reason — same self-check loop the
+        chat workflow uses with rendered PNGs, but mechanical.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Phases <small>every phase ends runnable locally — `make up`</small></h2>
+    <div class="body">
+      <table class="spec">
+        <tr><th>Phase</th><th>Build</th><th>Acceptance — “it runs” means</th></tr>
+        <tr><td>P0 · Scaffold</td>
+          <td>Repo layout below; docker-compose (frontend, backend-api, plan-agent stub, Postgres);
+            schema v2 + converter from <code>plan_v03.json</code>; d3 SVG renderer matching the
+            Pillow visual language; room click-select; comment queue UI; stub agent echoes a
+            version bump.</td>
+          <td><code>make up</code> → open app → pick 231-peats-ferry-rd → see v03 as SVG → select a
+            room → queue a comment → Send → version list shows v04 (echo).</td></tr>
+        <tr><td>P1 · Walls &amp; multi-select</td>
+          <td>Wall derivation in plan-core; wall/segment/chunk hit-testing with drag handles;
+            long-press + shift multi-select; target chips on comments.</td>
+          <td>Select a wall chunk between two rooms + the room, one comment carries both targets.</td></tr>
+        <tr><td>P2 · Diff engine</td>
+          <td>Object diff in plan-core; delta view (green/red/modified) with vs-original toggle;
+            git-style register generated from the diff + change metadata.</td>
+          <td>Loading original + v03 shows the full c01–c07 story visually and as diff hunks —
+            with no hand-written register.</td></tr>
+        <tr><td>P3 · Live agent loop</td>
+          <td>plan-agent for real: Pydantic AI + Claude (model config-swappable, mirroring
+            data-qa-agent's decision G); typed geometry ops + validator loop; SSE progress;
+            headline rent stats carried per version.</td>
+          <td>The v03 lavish session, replayed entirely in-app: comment → send → new version with
+            updated register and stats.</td></tr>
+        <tr><td>P4 · Ingestion</td>
+          <td>Upload listing PNG → Claude vision extracts rooms/dims → scale-confirm wizard (user
+            confirms two known dimensions) → schema-v2 draft → user approves (the app's version of
+            the scope.md lock).</td>
+          <td>A brand-new property goes image → reviewable geometry in one sitting.</td></tr>
+        <tr><td>P5 · Workflow parity</td>
+          <td>Rent comps + compliance flags surfaced per change (port the chat workflow's method);
+            SUMMARY + PNG export; plan library page.</td>
+          <td>App output matches the repo's paper-trail contract.</td></tr>
+        <tr><td>P6 · AWS</td>
+          <td>Terraform mirroring <code>data-qa-agent/infra/terraform</code>: App Runner ×3, RDS
+            Postgres (or Aurora Serverless v2), S3 + CloudFront, Secrets Manager, GitHub Actions
+            deploy on main. Auth deferred until here (Cognito or Entra OIDC — open question).</td>
+          <td>Merge to main deploys; the local compose and cloud shapes stay 1:1.</td></tr>
+      </table>
+      <h3>Repo layout (inside floor-plan-reviewer — decision D1 below)</h3>
+<pre>floor-plan-reviewer/
+├── AGENTS.md · CLAUDE.md · scripts/ · 231-peats-ferry-rd/   # existing chat workflow — untouched
+└── app/
+    ├── frontend/               # React + Vite + TS, d3 canvas, register, change list
+    ├── services/
+    │   ├── backend-api/        # FastAPI: REST + SSE, Postgres, storage adapter
+    │   └── plan-agent/         # Pydantic AI + Claude: ops loop, ingest, comps (later)
+    ├── packages/plan-core/     # schema v2, wall derivation, diff, validate, Pillow export
+    ├── db/                     # migrations
+    ├── docker-compose.yml
+    └── Makefile                # make up / make smoke</pre>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Risks, open questions, failure modes</h2>
+    <div class="body">
+      <ul>
+        <li><b>Image → geometry is the hardest ML step.</b> That's why it's Phase 4, behind a
+          library-first app, and always passes through a human scale-confirm + approve wizard.
+          Failure mode: bad extraction → user edits the draft or falls back to manual JSON.</li>
+        <li><b>Wall-chunk UX is fiddly.</b> Mitigation: whole-segment select by default, chunk only
+          via drag handles; snap t-values to 0.05; generous hit strokes.</li>
+        <li><b>Agent edits must not corrupt geometry.</b> All ops through plan-core validation with
+          bounce-back; versions immutable; head-only writes (a submitted batch targets the version
+          it was drawn on — stale submits are rejected with a rebase prompt).</li>
+        <li><b>Rect-only model</b> can't express diagonal walls, curved balconies, multi-storey
+          links. v1 constraint, documented; multi-storey = one plan object per level, later.</li>
+        <li><b>Two renderers, one look:</b> the d3/SVG canvas and the Pillow exporter must stay
+          visually in sync — plan-core owns the shared style constants (wall thickness, fills,
+          label rules incl. the “dims on every room” rule) so neither drifts.</li>
+        <li><b>Open question:</b> auth provider at P6 (Cognito vs Entra External ID like
+          data-qa-agent). Deliberately deferred — local app has no auth.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="card decision">
+    <h2>Decision D1 — where does the app live?</h2>
+    <form class="dbody" data-lavish-question="d1-location"
+      onsubmit="event.preventDefault();
+        const v = new FormData(event.currentTarget).get('d1'); if (!v) return;
+        window.lavish.queuePrompt('Lock D1 (app location): ' + v, { tag: 'choice',
+          text: 'D1: ' + v, element: event.currentTarget, queueKey: 'd1',
+          data: { question: 'd1-location', answer: v } });
+        this.querySelector('.queued').textContent = 'Queued: ' + v;">
+      <label><input type="radio" name="d1" value="app/ subfolder of floor-plan-reviewer (recommended)"/>
+        <span class="opt"><b>app/ in this repo (Recommended)</b><span>One repo, one story: chat workflow + app share plan-core and the property folders. Matches the portfolio's one-project-one-repo rule.</span></span></label>
+      <label><input type="radio" name="d1" value="new sibling repo floor-plan-studio"/>
+        <span class="opt"><b>New sibling repo</b><span>Cleaner separation, but duplicates geometry/renderer code or forces packaging it.</span></span></label>
+      <button type="submit">Queue D1</button><div class="queued">Nothing queued.</div>
+    </form>
+  </section>
+
+  <section class="card decision">
+    <h2>Decision D2 — plan canvas technology</h2>
+    <form class="dbody" data-lavish-question="d2-canvas"
+      onsubmit="event.preventDefault();
+        const v = new FormData(event.currentTarget).get('d2'); if (!v) return;
+        window.lavish.queuePrompt('Lock D2 (canvas tech): ' + v, { tag: 'choice',
+          text: 'D2: ' + v, element: event.currentTarget, queueKey: 'd2',
+          data: { question: 'd2-canvas', answer: v } });
+        this.querySelector('.queued').textContent = 'Queued: ' + v;">
+      <label><input type="radio" name="d2" value="d3 + SVG (recommended)"/>
+        <span class="opt"><b>d3 + SVG (Recommended)</b><span>Every room/wall is a DOM node — selection, hover, a11y, and diff colouring are native. Plans are small (tens of objects), so SVG performance is a non-issue.</span></span></label>
+      <label><input type="radio" name="d2" value="canvas engine (Konva/Pixi)"/>
+        <span class="opt"><b>Canvas engine (Konva/Pixi)</b><span>Only pays off at thousands of objects; hit-testing and text handling cost more code.</span></span></label>
+      <label><input type="radio" name="d2" value="keep PNG + hotspot overlays"/>
+        <span class="opt"><b>PNG + hotspots (status quo)</b><span>No wall chunks, no real diff view — falls short of the brief.</span></span></label>
+      <button type="submit">Queue D2</button><div class="queued">Nothing queued.</div>
+    </form>
+  </section>
+
+  <section class="card decision">
+    <h2>Decision D3 — backend &amp; agent stack</h2>
+    <form class="dbody" data-lavish-question="d3-stack"
+      onsubmit="event.preventDefault();
+        const v = new FormData(event.currentTarget).get('d3'); if (!v) return;
+        window.lavish.queuePrompt('Lock D3 (backend/agent stack): ' + v, { tag: 'choice',
+          text: 'D3: ' + v, element: event.currentTarget, queueKey: 'd3',
+          data: { question: 'd3-stack', answer: v } });
+        this.querySelector('.queued').textContent = 'Queued: ' + v;">
+      <label><input type="radio" name="d3" value="FastAPI + Pydantic AI (recommended, mirrors data-qa-agent)"/>
+        <span class="opt"><b>FastAPI + Pydantic AI (Recommended)</b><span>Mirrors data-qa-agent (its locked decision F) — typed tools for geometry ops, model-swappable, uv/ruff/mypy conventions already in this repo.</span></span></label>
+      <label><input type="radio" name="d3" value="FastAPI + raw Anthropic SDK"/>
+        <span class="opt"><b>FastAPI + raw Anthropic SDK</b><span>Fewer deps, hand-rolled tool loop — more code to own for the same result.</span></span></label>
+      <label><input type="radio" name="d3" value="Node/Express + Claude Agent SDK"/>
+        <span class="opt"><b>Node + Claude Agent SDK</b><span>One language with the frontend, but breaks reuse of plan-core/Pillow and the sibling's infra patterns.</span></span></label>
+      <button type="submit">Queue D3</button><div class="queued">Nothing queued.</div>
+    </form>
+  </section>
+
+  <section class="card decision">
+    <h2>Decision D4 — persistence from day 0</h2>
+    <form class="dbody" data-lavish-question="d4-persistence"
+      onsubmit="event.preventDefault();
+        const v = new FormData(event.currentTarget).get('d4'); if (!v) return;
+        window.lavish.queuePrompt('Lock D4 (persistence): ' + v, { tag: 'choice',
+          text: 'D4: ' + v, element: event.currentTarget, queueKey: 'd4',
+          data: { question: 'd4-persistence', answer: v } });
+        this.querySelector('.queued').textContent = 'Queued: ' + v;">
+      <label><input type="radio" name="d4" value="Postgres in docker-compose from P0 (recommended)"/>
+        <span class="opt"><b>Postgres from P0 (Recommended)</b><span>Same engine local and on AWS (RDS/Aurora) — no migration surprises; compose makes it free locally.</span></span></label>
+      <label><input type="radio" name="d4" value="SQLite first, Postgres at P6"/>
+        <span class="opt"><b>SQLite first</b><span>Slightly lighter start, guaranteed rework at deploy time.</span></span></label>
+      <button type="submit">Queue D4</button><div class="queued">Nothing queued.</div>
+    </form>
+  </section>
+
+  <footer>
+    Plan for review — no code exists yet. On approval this gets saved to the repo (ai-spec style) and
+    Phase 0 begins · Stack claims verified against data-qa-agent/AGENTS.md and this repo's scripts/ ·
+    floor-plan-reviewer, 2026-07-12.
+  </footer>
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) {
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "#000";
+    paint.fillStyle = color;
+    paint.fillRect(0, 0, 1, 1);
+    return paint.getImageData(0, 0, 1, 1).data;
+  }
+  function compositeRgba(foreground, background) {
+    const fa = foreground[3] / 255, ba = background[3] / 255;
+    const a = fa + ba * (1 - fa);
+    if (a === 0) return [0, 0, 0, 0];
+    return [
+      (foreground[0] * fa + background[0] * ba * (1 - fa)) / a,
+      (foreground[1] * fa + background[1] * ba * (1 - fa)) / a,
+      (foreground[2] * fa + background[2] * ba * (1 - fa)) / a,
+      a * 255,
+    ];
+  }
+  function pageIsDark() {
+    const root = document.documentElement;
+    const rootBg = toRgba(getComputedStyle(root).backgroundColor);
+    const bodyBg = document.body ? toRgba(getComputedStyle(document.body).backgroundColor) : [0, 0, 0, 0];
+    const [r, g, b, a] = compositeRgba(bodyBg, rootBg);
+    if (a > 0) return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+    const cs = getComputedStyle(root).colorScheme;
+    if (cs.includes("dark") && !cs.includes("light")) return true;
+    if (cs.includes("light") && !cs.includes("dark")) return false;
+    return darkQuery.matches;
+  }
+  const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+  let applied, rendering = false, queued = false;
+  function queueRender() { queued = true; if (!rendering) void render(); }
+  async function render() {
+    rendering = true;
+    try {
+      while (queued) {
+        queued = false;
+        const theme = pageIsDark() ? "dark" : "default";
+        if (theme === applied) continue;
+        mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+        for (const { el, src } of diagrams) { el.removeAttribute("data-processed"); el.textContent = src; }
+        try { await mermaid.run({ nodes: diagrams.map((d) => d.el) }); }
+        catch (error) { console.error("Mermaid diagram render failed:", error); return; }
+        applied = theme;
+      }
+    } finally { rendering = false; if (queued) queueRender(); }
+  }
+  if (document.readyState === "complete") queueRender();
+  else window.addEventListener("load", queueRender, { once: true });
+  const themeObserver = new MutationObserver(queueRender);
+  for (const el of [document.documentElement, document.body]) {
+    if (!el) continue;
+    themeObserver.observe(el, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+  }
+  document.addEventListener("change", queueRender, true);
+  document.addEventListener("transitionend", ({ propertyName }) => {
+    if (propertyName === "background-color") queueRender();
+  }, true);
+  darkQuery.addEventListener("change", queueRender);
+</script>

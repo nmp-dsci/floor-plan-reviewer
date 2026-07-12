@@ -1,0 +1,29 @@
+[project]
+name = "floor-plan-reviewer"
+version = "0.1.0"
+description = "Chat-driven agent workflow that reworks a property's floor plan (within its existing envelope) to maximise achievable weekly rent."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["pillow>=10.1"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14",
+    "mypy>=1.14",
+    "pytest>=8.3",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+
+[[tool.mypy.overrides]]
+module = "PIL.*"
+ignore_missing_imports = true

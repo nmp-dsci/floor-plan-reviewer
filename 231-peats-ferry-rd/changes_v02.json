@@ -1,0 +1,51 @@
+{
+  "version": 2,
+  "property": "231-peats-ferry-rd",
+  "base_image": "original.png",
+  "changes": [
+    {
+      "id": "c01",
+      "added_in_version": 1,
+      "kind": "convert",
+      "title": "Tandem garage → Bedroom 4 + walk-in robe + ensuite",
+      "rationale": "Largest single lever: 32.4 m² of room-sized, street-fronting floor area. Moves the property from the 3b/1b comp pool into the 4b/2b pool in one step; the second bathroom alone carries roughly a +$100/wk premium locally.",
+      "rent_impact_per_week": 150,
+      "compliance": {
+        "pathway": "DA",
+        "notes": [
+          "Change of use garage → habitable + loss of covered parking (Hornsby DCP) — DA likely, CDC possible if Housing Code criteria met",
+          "Habitable room: ≥2.4 m ceiling, natural light ~10% / ventilation ~5% of floor area — new street-facing window(s)",
+          "Slab floor level, damp-proofing and insulation (BASIX) to habitable standard",
+          "Ensuite drainage is a new run remote from the east wet stack — hydraulic advice"
+        ]
+      },
+      "boxes": [
+        { "x": 45, "y": 64, "w": 166, "h": 380, "label": "Bed 4" },
+        { "x": 57, "y": 274, "w": 102, "h": 166, "label": "walk-in robe" },
+        { "x": 48, "y": 446, "w": 160, "h": 74, "label": "ensuite" }
+      ]
+    },
+    {
+      "id": "c02",
+      "added_in_version": 2,
+      "kind": "convert",
+      "title": "Enclose balcony (7.5 × 2.9 m) → new living area, opened to kitchen/dining",
+      "rationale": "Adds 21.8 m² of internal living under the existing roofline and creates an open-plan living/dining/kitchen across the north face. Modest direct uplift, but it is the structural prerequisite for converting the lounge to Bedroom 5 in a later version without gutting liveability.",
+      "rent_impact_per_week": 40,
+      "compliance": {
+        "pathway": "specialist",
+        "notes": [
+          "Opening the former external wall between balcony and kitchen/dining is structural (likely load-bearing under the roof) — engineer first; pathway likely CDC/DA once engineered",
+          "Former balcony floor: waterproofing, floor level step and insulation to habitable standard; balustrade edge becomes a glazed external wall (BASIX)",
+          "Dining and kitchen then borrow light through the enclosed zone — check natural light/ventilation ratios still met",
+          "External stair off the balcony is absorbed — retain/relocate yard access and check egress"
+        ]
+      },
+      "boxes": [
+        { "x": 212, "y": 64, "w": 396, "h": 148, "label": "enclose balcony\nnew living area" },
+        { "x": 212, "y": 212, "w": 396, "h": 34, "label": "remove wall — open plan (structural)", "style": "outline" }
+      ]
+    }
+  ],
+  "rent": { "currency": "AUD", "baseline_per_week": 850, "proposed_per_week": 1040 }
+}

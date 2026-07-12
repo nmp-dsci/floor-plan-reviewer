@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "floor-plan-reviewer/changes.schema.json",
+  "title": "Cumulative floor-plan change set (changes_v##.json)",
+  "description": "Source of truth for one proposal version. Cumulative: version N contains every change from versions 1..N. scripts/render_overlay.py renders it onto the base image as propose_v##.png.",
+  "type": "object",
+  "required": ["version", "changes"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Proposal version. Must match the file name (changes_v03.json -> 3)."
+    },
+    "property": {
+      "type": "string",
+      "description": "Property folder slug, e.g. 231-peats-ferry-rd."
+    },
+    "base_image": {
+      "type": "string",
+      "default": "original.png",
+      "description": "Floor-plan image the boxes are measured against, relative to this file. Coordinates are pixels at that image's native resolution."
+    },
+    "changes": {
+      "type": "array",
+      "description": "All changes up to and including this version, oldest first.",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "boxes"],
+        "properties": {
+          "id": { "type": "string", "description": "Stable id, e.g. c01. Never reused." },
+          "added_in_version": { "type": "integer", "minimum": 1 },
+          "kind": {
+            "type": "string",
+            "enum": ["repurpose", "convert", "new_wet_area", "wall_move", "new_opening", "note"]
+          },
+          "title": { "type": "string", "description": "e.g. 'Garage -> Bedroom 4 + WIR + ensuite'." },
+          "rationale": { "type": "string" },
+          "rent_impact_per_week": {
+            "type": "number",
+            "description": "Estimated AUD $/week uplift attributed to this change (from live comps)."
+          },
+          "compliance": {
+            "type": "object",
+            "properties": {
+              "pathway": { "type": "string", "enum": ["exempt", "CDC", "DA", "specialist"] },
+              "notes": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "boxes": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Rectangles drawn on the base image for this change.",
+            "items": {
+              "type": "object",
+              "required": ["x", "y", "w", "h"],
+              "properties": {
+                "x": { "type": "integer", "minimum": 0 },
+                "y": { "type": "integer", "minimum": 0 },
+                "w": { "type": "integer", "minimum": 1 },
+                "h": { "type": "integer", "minimum": 1 },
+                "label": { "type": "string", "description": "Text centred in the box. Use \\n for forced line breaks." },
+                "style": { "type": "string", "enum": ["filled", "outline"], "default": "filled" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "rent": {
+      "type": "object",
+      "description": "Weekly rent position after this version. Figures must trace to comps cited in propose_v##.md.",
+      "properties": {
+        "currency": { "type": "string", "const": "AUD" },
+        "baseline_per_week": { "type": "number" },
+        "proposed_per_week": { "type": "number" }
+      }
+    }
+  }
+}
