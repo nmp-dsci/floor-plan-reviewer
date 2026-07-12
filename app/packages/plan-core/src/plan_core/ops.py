@@ -208,6 +208,22 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
         return f"o{max_oid:02d}"
 
     for op in ops:
+        # Skip (don't crash) ops whose target no longer exists — e.g. an
+        # uncommitted preview id (pv-room1) that never reached the server, or a
+        # room removed earlier in the same batch.
+        room_ref = getattr(op, "room_id", None)
+        if room_ref is not None and all(r.id != room_ref for r in g.rooms):
+            warnings.append(f"{op.op}: room '{room_ref}' not found; skipped")
+            continue
+        other_ref = getattr(op, "other_id", None)
+        if other_ref is not None and all(r.id != other_ref for r in g.rooms):
+            warnings.append(f"{op.op}: room '{other_ref}' not found; skipped")
+            continue
+        wall_ref = getattr(op, "wall_id", None)
+        if wall_ref is not None and all(w.id != wall_ref for w in g.walls):
+            warnings.append(f"{op.op}: wall '{wall_ref}' not found; skipped")
+            continue
+
         if isinstance(op, Rename):
             g.room(op.room_id).name = op.name
         elif isinstance(op, SetKind):

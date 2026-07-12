@@ -224,6 +224,19 @@ def test_add_room_creates_valid_room() -> None:
     assert any(line.obj == "room" and line.op == "add" and "butlers" in line.id for line in lines)
 
 
+def test_op_targeting_missing_object_is_skipped_not_crash(v03) -> None:
+    # a resize op referencing an uncommitted preview id must warn, never raise
+    result = apply_ops(
+        v03,
+        parse_ops(
+            [{"op": "resize_room", "room_id": "pv-room1", "x": 0, "y": 0, "w": 3, "h": 3}]
+        ),
+    )
+    assert any("pv-room1" in w and "not found" in w for w in result.warnings), result.warnings
+    errors, _ = validate(result.geometry)
+    assert errors == []  # untouched geometry stays valid
+
+
 def test_footprint_change_is_rejected() -> None:
     from plan_core import PlanGeometry, Room
 

@@ -548,10 +548,12 @@ export default function PlanCanvas({
           </g>
         )}
 
-        {/* interaction layer */}
+        {/* interaction layer — preview (pv-) objects are uncommitted, not selectable */}
         {interactive && (
           <g>
-            {geometry.rooms.map((r) => (
+            {geometry.rooms
+              .filter((r) => !r.id.startsWith('pv-'))
+              .map((r) => (
               <rect
                 key={`hit-${r.id}`}
                 className="room-hit"
@@ -602,9 +604,11 @@ export default function PlanCanvas({
                 </line>
               );
             })}
-            {/* opening hit rects */}
+            {/* opening hit rects — preview openings (pv-) are uncommitted */}
             {geometry.walls.map((w) =>
-              w.openings.map((o) => {
+              w.openings
+                .filter((o) => !o.id.startsWith('pv-'))
+                .map((o) => {
                 const half = wallHalf(w) + 4;
                 const a0 = tToAbs(w, o.t0);
                 const a1 = tToAbs(w, o.t1);
@@ -632,7 +636,9 @@ export default function PlanCanvas({
               }),
             )}
             {/* fixture hit rects (above room hits) */}
-            {geometry.fixtures.map((f) => (
+            {geometry.fixtures
+              .filter((f) => !f.id.startsWith('pv-'))
+              .map((f) => (
               <rect
                 key={`fhit-${f.id}`}
                 className="fixture-hit"
