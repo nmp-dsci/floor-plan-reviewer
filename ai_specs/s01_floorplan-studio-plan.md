@@ -17,8 +17,12 @@ the s00 review page. Built to deploy to AWS later exactly like sibling `data-qa-
 |---|----------|--------|
 | D1 | App location | `app/` subfolder of this repo — chat workflow + app share `plan-core` and property folders |
 | D2 | Plan canvas | **d3 + SVG** — every room/wall is a DOM node; selection, hover, diff colouring native |
-| D3 | Backend & agent | **FastAPI + Pydantic AI** (mirrors data-qa-agent locked decision F); Claude, model config-swappable |
+| D3 | Backend & agent | **FastAPI + Pydantic AI** (mirrors data-qa-agent locked decision F); model provider per D5 |
 | D4 | Persistence | **Postgres in docker-compose from P0** — same engine as AWS RDS/Aurora later |
+| D5 | Model provider | **Abstracted, mirroring data-qa-agent decision G** (owner, 2026-07-12): Pydantic AI model string from config — default **DeepSeek (`deepseek-chat`)** for the geometry-ops loop as the cost option; **Claude** one-env-var swappable for quality escalation and **required for P4 vision ingestion** (DeepSeek's API takes no image input). The validator bounce-back loop is what makes the cheaper default safe. |
+
+Keys in `app/.env` (never committed): `DEEPSEEK_API_KEY` for the default loop;
+`ANTHROPIC_API_KEY` for vision ingestion / escalation.
 
 Open question (deliberately deferred to P6): auth provider — Cognito vs Entra External ID.
 
@@ -83,7 +87,8 @@ additions. That makes diffing set comparison: `add` / `remove` / `modify` per ro
 - **frontend** — React + Vite + TS; d3 SVG canvas, delta view, register, change list. REST + SSE.
 - **backend-api** — FastAPI; plans/reviews/versions/comments; SSE events; storage adapter
   (local volume → S3).
-- **plan-agent** — Pydantic AI + Claude; applies comment batches via **typed geometry ops only**
+- **plan-agent** — Pydantic AI + pluggable LLM (D5: DeepSeek default, Claude for
+  vision/escalation); applies comment batches via **typed geometry ops only**
   (`split_room`, `merge_rooms`, `set_kind`, `add_opening(wall,t0,t1,type)`,
   `remove_wall_chunk`, `add_fixture`, …) — never SVG/pixels. Vision ingest (P4), rent comps +
   compliance (P5).
@@ -113,8 +118,8 @@ additions. That makes diffing set comparison: `add` / `remove` / `modify` per ro
 | P0 Scaffold | compose (frontend, backend-api, plan-agent stub, Postgres); schema v2 + converter from `plan_v03.json`; d3 renderer matching Pillow look; room click-select; comment queue; echo agent | `make up` → load 231-peats-ferry-rd → select room → queue → Send → v04 (echo) appears |
 | P1 Walls | wall derivation; segment/chunk hit-testing + handles; long-press multi-select; target chips | one comment carries room + wall-chunk targets |
 | P2 Diff | object diff; delta view; generated git-style register | original vs v03 shows c01–c07 with no hand-written register |
-| P3 Agent loop | Pydantic AI + Claude; typed ops + validator bounce-back; SSE; per-version rent stats | the v03 lavish session replayed entirely in-app |
-| P4 Ingestion | upload PNG → vision extract → scale-confirm wizard (two known dims) → draft → approve (app's scope.md lock) | new property: image → reviewable geometry in one sitting |
+| P3 Agent loop | Pydantic AI + pluggable LLM (D5 — DeepSeek default); typed ops + validator bounce-back; SSE; per-version rent stats | the v03 lavish session replayed entirely in-app |
+| P4 Ingestion | upload PNG → vision extract (Claude multimodal, per D5) → scale-confirm wizard (two known dims) → draft → approve (app's scope.md lock) | new property: image → reviewable geometry in one sitting |
 | P5 Parity | rent comps + compliance per change; SUMMARY + PNG export; library page | app output matches repo paper-trail contract |
 | P6 AWS | Terraform mirroring `data-qa-agent/infra/terraform`: App Runner ×3, RDS Postgres, S3+CloudFront, Secrets Manager, GH Actions deploy on main; auth decided here | merge to main deploys; compose and cloud shapes 1:1 |
 

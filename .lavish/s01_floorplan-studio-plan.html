@@ -455,8 +455,9 @@ sequenceDiagram
         <tr><th>#</th><th>Decision</th><th>Locked choice</th></tr>
         <tr><td>D1</td><td>App location</td><td><code>app/</code> subfolder of floor-plan-reviewer — one repo, shared plan-core and property folders</td></tr>
         <tr><td>D2</td><td>Plan canvas</td><td><b>d3 + SVG</b> — geometry-native selection, hover, and diff colouring</td></tr>
-        <tr><td>D3</td><td>Backend &amp; agent</td><td><b>FastAPI + Pydantic AI</b> — mirrors data-qa-agent's locked decision F; Claude, model config-swappable</td></tr>
+        <tr><td>D3</td><td>Backend &amp; agent</td><td><b>FastAPI + Pydantic AI</b> — mirrors data-qa-agent's locked decision F; model per D5</td></tr>
         <tr><td>D4</td><td>Persistence</td><td><b>Postgres in docker-compose from P0</b> — same engine as AWS RDS/Aurora later</td></tr>
+        <tr><td>D5</td><td>Model provider</td><td>Abstracted (data-qa-agent decision G): <b>DeepSeek default</b> for the ops loop; Claude one-env-var swappable and <b>required for P4 vision</b> (DeepSeek API is text-only)</td></tr>
       </table>
       <p style="margin-top:10px">Spec saved to <code>ai_specs/s01_floorplan-studio-plan.md</code>.
         The one deliberately open question remains auth at P6 (Cognito vs Entra External ID).</p>
