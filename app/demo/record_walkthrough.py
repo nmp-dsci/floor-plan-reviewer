@@ -65,11 +65,12 @@ def caption(page: Page, key: str) -> None:
             bar = document.createElement('div');
             bar.id = 'demo-caption';
             Object.assign(bar.style, {
-              position: 'fixed', left: '0', right: '0', bottom: '0', zIndex: '99999',
+              position: 'fixed', left: '0', right: '0', top: '80%', zIndex: '99999',
               background: 'rgba(20,20,22,0.93)', color: '#fff',
               font: '600 16.5px/1.45 "Helvetica Neue", Arial, sans-serif',
               padding: '13px 30px', textAlign: 'center',
-              borderTop: '3px solid #e23d28', pointerEvents: 'none',
+              borderTop: '3px solid #e23d28', borderBottom: '3px solid #e23d28',
+              pointerEvents: 'none',
             });
             document.body.appendChild(bar);
           }
