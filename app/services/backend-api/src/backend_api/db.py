@@ -2,7 +2,17 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, create_engine
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    create_engine,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from backend_api.config import DATABASE_URL
@@ -47,6 +57,8 @@ class Version(Base):
     changes: Mapped[list[Any]] = mapped_column(JSON, default=list)
     register: Mapped[list[Any]] = mapped_column(JSON, default=list)
     rent: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # bookmarked versions survive auto-pruning; v0 (original) and the head are always kept
+    saved: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 

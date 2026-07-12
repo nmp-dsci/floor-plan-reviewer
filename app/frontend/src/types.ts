@@ -87,6 +87,7 @@ export interface VersionSummary {
   config: string;
   internal_area?: number;
   total_area?: number;
+  saved?: boolean;
   created_at: string;
 }
 
@@ -137,11 +138,19 @@ export interface OpeningSelection {
   wallId: string;
 }
 
+export interface Region {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface Selection {
   rooms: string[];
   walls: WallSelection[];
   fixtures: string[];
   openings: OpeningSelection[];
+  region?: Region | null;
 }
 
 export const emptySelection = (): Selection => ({
@@ -149,20 +158,29 @@ export const emptySelection = (): Selection => ({
   walls: [],
   fixtures: [],
   openings: [],
+  region: null,
 });
 
 export const hasSelection = (s: Selection): boolean =>
-  s.rooms.length > 0 || s.walls.length > 0 || s.fixtures.length > 0 || s.openings.length > 0;
+  s.rooms.length > 0 ||
+  s.walls.length > 0 ||
+  s.fixtures.length > 0 ||
+  s.openings.length > 0 ||
+  Boolean(s.region);
 
-export type Tool = 'select' | 'add-opening' | 'add-fixture';
+export type Tool = 'select' | 'add-opening' | 'add-fixture' | 'add-room';
 
 export interface QueuedComment {
   id: string;
   text: string;
   targets: {
-    type: 'room' | 'wall' | 'fixture';
+    type: 'room' | 'wall' | 'fixture' | 'region';
     id: string;
     t0?: number;
     t1?: number;
+    x?: number;
+    y?: number;
+    w?: number;
+    h?: number;
   }[];
 }

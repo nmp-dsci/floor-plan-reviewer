@@ -8,15 +8,19 @@ import Register from '../components/Register';
 import type { Op } from '../editing';
 import { applyOpsPreview, describeOps, touchedIds } from '../editing';
 import type {
+  Fixture,
   PlanGeometry,
   QueuedComment,
   RegisterHunk,
   Review as ReviewT,
+  Room,
   Selection,
   Tool,
   VersionDetail,
 } from '../types';
 import { emptySelection, hasSelection } from '../types';
+
+type Clipboard = { kind: 'room'; data: Room } | { kind: 'fixture'; data: Fixture } | null;
 
 interface Props {
   reviewId: string;
@@ -44,6 +48,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
     }
   });
   const [busy, setBusy] = useState(false);
+  const [clipboard, setClipboard] = useState<Clipboard>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [banner, setBanner] = useState<{ kind: 'busy' | 'error' | 'ok'; text: string } | null>(null);
   const currentNRef = useRef<number | null>(null);
@@ -124,29 +129,68 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
     [reviewId, loadReview, onVersionAdded],
   );
 
-  // Delete / Backspace removes the selected objects (as pending remove ops).
+  // Keyboard: Delete removes selection; Cmd/Ctrl+C copies a room/fixture, +V pastes it.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
       const t = e.target as HTMLElement | null;
       if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
-      if (review === null || currentN !== review.head_n) return;
-      if (!hasSelection(selection)) return;
-      e.preventDefault();
-      const ops: Op[] = [
-        ...selection.rooms.map((id) => ({ op: 'remove_room', room_id: id }) as Op),
-        ...selection.fixtures.map((id) => ({ op: 'remove_fixture', fixture_id: id }) as Op),
-        ...selection.openings.map((o) => ({ op: 'remove_opening', opening_id: o.id }) as Op),
-        ...selection.walls.map(
-          (w) => ({ op: 'remove_wall_chunk', wall_id: w.id, t0: w.t0, t1: w.t1 }) as Op,
-        ),
-      ];
-      setPending((p) => [...p, ...ops]);
-      setSelection(emptySelection());
+      if (review === null || currentN !== review.head_n || !detail) return;
+      const mod = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (!hasSelection(selection)) return;
+        e.preventDefault();
+        setPending((p) => [
+          ...p,
+          ...selection.rooms.map((id) => ({ op: 'remove_room', room_id: id }) as Op),
+          ...selection.fixtures.map((id) => ({ op: 'remove_fixture', fixture_id: id }) as Op),
+          ...selection.openings.map((o) => ({ op: 'remove_opening', opening_id: o.id }) as Op),
+          ...selection.walls.map(
+            (w) => ({ op: 'remove_wall_chunk', wall_id: w.id, t0: w.t0, t1: w.t1 }) as Op,
+          ),
+        ]);
+        setSelection(emptySelection());
+        return;
+      }
+
+      if (mod && key === 'c') {
+        if (selection.rooms.length === 1) {
+          const r = detail.geometry.rooms.find((r) => r.id === selection.rooms[0]);
+          if (r) {
+            setClipboard({ kind: 'room', data: r });
+            e.preventDefault();
+          }
+        } else if (selection.fixtures.length === 1) {
+          const f = detail.geometry.fixtures.find((f) => f.id === selection.fixtures[0]);
+          if (f) {
+            setClipboard({ kind: 'fixture', data: f });
+            e.preventDefault();
+          }
+        }
+        return;
+      }
+
+      if (mod && key === 'v' && clipboard) {
+        e.preventDefault();
+        if (clipboard.kind === 'room') {
+          const r = clipboard.data;
+          setPending((p) => [
+            ...p,
+            { op: 'add_room', name: `${r.name} copy`, kind: r.kind, x: r.x + r.w + 0.15, y: r.y, w: r.w, h: r.h, fill: r.fill },
+          ]);
+        } else {
+          const f = clipboard.data;
+          setPending((p) => [
+            ...p,
+            { op: 'add_fixture', x: f.x + 0.3, y: f.y + 0.3, w: f.w, h: f.h, label: f.label ? `${f.label} copy` : '' },
+          ]);
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selection, currentN, review]);
+  }, [selection, currentN, review, detail, clipboard]);
 
   if (!review || currentN === null || !detail) {
     return <div className="banner">Loading review…</div>;
@@ -200,6 +244,13 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
     });
   };
 
+  const bookmarkVersion = (n: number) => {
+    api
+      .bookmarkVersion(reviewId, n)
+      .then(() => loadReview(false))
+      .catch((e) => setBanner({ kind: 'error', text: friendly(e) }));
+  };
+
   const deleteVersion = (n: number) => {
     setBusy(true);
     setBanner({ kind: 'busy', text: `Deleting v${String(n).padStart(2, '0')}…` });
@@ -240,6 +291,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
             .catch((e) => setBanner({ kind: 'error', text: friendly(e) }))
         }
         onDeleteVersion={deleteVersion}
+        onBookmark={bookmarkVersion}
       />
 
       {banner && <div className={`banner ${banner.kind === 'ok' ? '' : banner.kind}`}>{banner.text}</div>}
@@ -265,6 +317,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
               tool={tool}
               onTool={setTool}
               onOps={queueOps}
+              onRegion={(region) => setSelection({ ...emptySelection(), region })}
               pendingIds={pendingMarks}
             />
             {mode === 'delta' && (

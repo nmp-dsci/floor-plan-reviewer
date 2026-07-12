@@ -39,6 +39,18 @@ export default function ChangeList({
           id: w.id,
           ...(w.whole ? {} : { t0: w.t0, t1: w.t1 }),
         })),
+        ...(selection.region
+          ? [
+              {
+                type: 'region' as const,
+                id: 'space',
+                x: selection.region.x,
+                y: selection.region.y,
+                w: selection.region.w,
+                h: selection.region.h,
+              },
+            ]
+          : []),
       ],
     });
     setText('');
@@ -62,6 +74,11 @@ export default function ChangeList({
                 {w.whole ? '' : ` · ${w.t0.toFixed(2)}–${w.t1.toFixed(2)}`}
               </span>
             ))}
+            {selection.region && (
+              <span className="chip">
+                space {selection.region.w.toFixed(1)}×{selection.region.h.toFixed(1)}m
+              </span>
+            )}
           </div>
           <textarea
             value={text}

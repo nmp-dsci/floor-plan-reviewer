@@ -51,6 +51,8 @@ comment using ONLY the typed operations available. Rules:
   (type "door" ~0.9m, "window", or "open" for wide openings).
 - To repurpose a room (e.g. store → study) use set_kind with a new name/kind and fill "white"
   for habitable use; use split_room / merge_rooms for layout surgery; keep every room ≥ 0.7m.
+- To create a NEW room in free space (e.g. a butler's pantry carved out after shrinking the
+  kitchen) use add_room with name/kind/x/y/w/h; it must sit inside the envelope and not overlap.
 - Fixtures (cabinetry, benches, robes — thin-line joinery) have stable ids like
   `fx:island-bench-1`: use add_fixture / modify_fixture / remove_fixture with fixture_id.
 - Prefer the smallest set of ops that satisfies the comments. Estimate the weekly rent impact
@@ -80,12 +82,18 @@ def _describe_geometry(geo: PlanGeometry) -> str:
 def _describe_comments(comments: list[dict[str, Any]]) -> str:
     lines = ["OWNER COMMENTS:"]
     for i, c in enumerate(comments, 1):
-        targets = ", ".join(
-            f"{t['type']}:{t['id']}"
-            + (f" chunk t={t['t0']:.2f}-{t['t1']:.2f}" if t.get("t0") is not None else "")
-            for t in c.get("targets", [])
-        )
-        lines.append(f'{i}. "{c["text"]}"  [targets: {targets or "whole plan"}]')
+        parts = []
+        for t in c.get("targets", []):
+            if t.get("type") == "region" and t.get("x") is not None:
+                parts.append(
+                    f"empty space rect x={t['x']:.2f},y={t['y']:.2f},"
+                    f"w={t['w']:.2f},h={t['h']:.2f} (use add_room here)"
+                )
+            elif t.get("t0") is not None:
+                parts.append(f"{t['type']}:{t['id']} chunk t={t['t0']:.2f}-{t['t1']:.2f}")
+            else:
+                parts.append(f"{t['type']}:{t['id']}")
+        lines.append(f'{i}. "{c["text"]}"  [targets: {", ".join(parts) or "whole plan"}]')
     return "\n".join(lines)
 
 

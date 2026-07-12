@@ -46,6 +46,7 @@ interface Props {
   tool?: Tool;
   onTool?: (t: Tool) => void;
   onOps?: (ops: Op[]) => void;
+  onRegion?: (r: { x: number; y: number; w: number; h: number }) => void;
   pendingIds?: Set<string>;
 }
 
@@ -74,6 +75,7 @@ export default function PlanCanvas({
   tool = 'select',
   onTool,
   onOps,
+  onRegion,
   pendingIds,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -214,9 +216,10 @@ export default function PlanCanvas({
   );
 
   // long-press anywhere on the canvas → sticky multi-select mode
+  const drawing = (tool === 'add-fixture' || tool === 'add-room') && editable;
   const onPointerDownBg = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!interactive) return;
-    if (tool === 'add-fixture' && editable) {
+    if (drawing) {
       const { mx, my } = toMetres(e.clientX, e.clientY);
       setDraw({ x0: mx, y0: my, x1: mx, y1: my });
       (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -233,15 +236,17 @@ export default function PlanCanvas({
   };
   const onPointerUpBg = (e: React.PointerEvent<SVGSVGElement>) => {
     cancelPress();
-    if (draw && onOps) {
+    if (draw) {
       const x = snapM(Math.min(draw.x0, draw.x1));
       const y = snapM(Math.min(draw.y0, draw.y1));
       const w = snapM(Math.abs(draw.x1 - draw.x0));
       const h = snapM(Math.abs(draw.y1 - draw.y0));
+      const wasRoom = tool === 'add-room';
       setDraw(null);
       onTool?.('select');
       if (w >= 0.2 && h >= 0.2) {
-        onOps([{ op: 'add_fixture', x, y, w, h, label: '' }]);
+        if (wasRoom) onRegion?.({ x, y, w, h });
+        else onOps?.([{ op: 'add_fixture', x, y, w, h, label: '' }]);
       }
       e.stopPropagation();
     }
@@ -499,10 +504,10 @@ export default function PlanCanvas({
         )}
 
         {/* pending (uncommitted) markers */}
-        {pendingIds && pendingIds.size > 0 && (
+        {pendingIds && (
           <g pointerEvents="none">
             {geometry.rooms
-              .filter((r) => pendingIds.has(r.id))
+              .filter((r) => pendingIds.has(r.id) || r.id.startsWith('pv-room'))
               .map((r) => {
                 const lr = liveRect('room', r.id, r);
                 return (
@@ -738,7 +743,36 @@ export default function PlanCanvas({
           );
         })}
 
-        {/* add-fixture draw preview */}
+        {/* selected space (region) → becomes a new room or an agent target */}
+        {selection.region && (
+          <g pointerEvents="none">
+            <rect
+              x={X(selection.region.x)}
+              y={Y(selection.region.y)}
+              width={px(selection.region.w)}
+              height={px(selection.region.h)}
+              fill="rgba(226,61,40,0.08)"
+              stroke={RED}
+              strokeWidth={2.5}
+              strokeDasharray="7 4"
+            />
+            <text
+              x={X(selection.region.x + selection.region.w / 2)}
+              y={Y(selection.region.y + selection.region.h / 2)}
+              fontSize={11}
+              fontWeight={700}
+              textAnchor="middle"
+              fill={RED}
+              stroke="#fff"
+              strokeWidth={3}
+              paintOrder="stroke"
+            >
+              NEW ROOM · {selection.region.w.toFixed(1)}×{selection.region.h.toFixed(1)}m
+            </text>
+          </g>
+        )}
+
+        {/* add-fixture / add-room draw preview */}
         {draw && (
           <rect
             x={X(Math.min(draw.x0, draw.x1))}
@@ -766,6 +800,11 @@ export default function PlanCanvas({
         {tool === 'add-fixture' && (
           <text x={10} y={20} fontSize={12} fontWeight={700} fill={AMBER} letterSpacing={2}>
             ADD FIXTURE — drag a rectangle
+          </text>
+        )}
+        {tool === 'add-room' && (
+          <text x={10} y={20} fontSize={12} fontWeight={700} fill={AMBER} letterSpacing={2}>
+            ADD ROOM — drag out the space
           </text>
         )}
       </svg>

@@ -71,6 +71,7 @@ def _version_summary(v: Version) -> dict[str, Any]:
         "config": geo.summary_config(),
         "internal_area": round(geo.internal_area(), 1),
         "total_area": round(geo.total_area(), 1),
+        "saved": v.saved,
         "created_at": v.created_at.isoformat(),
     }
 
@@ -82,6 +83,19 @@ def _job_running(db, review_id: str) -> bool:
         ).scalar_one_or_none()
         is not None
     )
+
+
+def _prune_unsaved(db, review_id: str, keep_n: int) -> list[int]:
+    """Keep the original (v0), the new head, and any bookmarked versions; drop the rest.
+    This is what stops every incremental edit from piling up — history stays lean."""
+    pruned: list[int] = []
+    for v in _versions(db, review_id):
+        if v.n != 0 and v.n != keep_n and not v.saved:
+            pruned.append(v.n)
+            db.delete(v)
+    if pruned:
+        db.commit()
+    return pruned
 
 
 # ---------- basic reads ----------
@@ -167,6 +181,10 @@ class CommentTarget(BaseModel):
     id: str
     t0: float | None = None
     t1: float | None = None
+    x: float | None = None
+    y: float | None = None
+    w: float | None = None
+    h: float | None = None
 
 
 class CommentIn(BaseModel):
@@ -277,6 +295,7 @@ async def _run_job(job_id: str, review_id: str, batch: CommentBatch) -> None:
             db.add(version)
             db.commit()
             new_n = version.n
+            _prune_unsaved(db, review_id, new_n)
         set_status("done")
         publish(
             {
@@ -378,6 +397,7 @@ def apply_edits(review_id: str, batch: EditBatch) -> dict[str, Any]:
         db.add(version)
         db.commit()
         new_n = version.n
+        _prune_unsaved(db, review_id, new_n)
 
     hub.publish(
         review_id,
@@ -409,11 +429,27 @@ def delete_version(review_id: str, n: int) -> dict[str, Any]:
             raise HTTPException(409, "an agent job is running — wait for it to finish")
         db.delete(head)
         db.commit()
-        new_head = n - 1
-    hub.publish(
-        review_id, {"type": "version.deleted", "n": n, "head_n": new_head}
-    )
+        remaining = _versions(db, review_id)
+        # the previous kept version becomes head (intermediates may have been pruned)
+        new_head = remaining[-1].n if remaining else 0
+    hub.publish(review_id, {"type": "version.deleted", "n": n, "head_n": new_head})
     return {"deleted": n, "head_n": new_head}
+
+
+@app.post("/api/reviews/{review_id}/versions/{n}/bookmark")
+def bookmark_version(review_id: str, n: int) -> dict[str, Any]:
+    """Toggle a version's bookmark. Bookmarked versions survive auto-pruning."""
+    with session() as db:
+        versions = {v.n: v for v in _versions(db, review_id)}
+        if n not in versions:
+            raise HTTPException(404, f"version {n} not found")
+        if n == 0:
+            raise HTTPException(422, "the original is always kept")
+        v = versions[n]
+        v.saved = not v.saved
+        db.commit()
+        saved = v.saved
+    return {"n": n, "saved": saved}
 
 
 @app.get("/api/reviews/{review_id}/registers")

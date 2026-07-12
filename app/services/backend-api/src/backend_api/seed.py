@@ -67,9 +67,11 @@ def seed_if_empty() -> None:
                     "baseline_per_week": meta["baseline_per_week"],
                     "proposed_per_week": meta["baseline_per_week"],
                 },
+                saved=True,  # the original is always kept
             )
         )
 
+        last_entry = meta["versions"][-1] if meta["versions"] else None
         prev_geo = original
         for entry in meta["versions"]:
             geo = convert_v1(json.loads((SEED_DIR / entry["plan"]).read_text()))
@@ -101,6 +103,8 @@ def seed_if_empty() -> None:
                         "baseline_per_week": meta["baseline_per_week"],
                         "proposed_per_week": entry["rent"],
                     },
+                    # bookmark the final curated proposal so it survives the first user edit
+                    saved=(entry is last_entry),
                 )
             )
             prev_geo = geo

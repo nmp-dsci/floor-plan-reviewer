@@ -50,6 +50,17 @@ class SplitRoom(BaseModel):
     gap: float = 0.1  # wall gap left between the two rooms
 
 
+class AddRoom(BaseModel):
+    op: Literal["add_room"]
+    name: str
+    kind: Kind | None = None
+    x: float
+    y: float
+    w: float
+    h: float
+    fill: Literal["white", "grey"] = "white"
+
+
 class MergeRooms(BaseModel):
     op: Literal["merge_rooms"]
     room_id: str
@@ -121,6 +132,7 @@ _OpUnion = (
     | SetKind
     | ResizeRoom
     | SplitRoom
+    | AddRoom
     | MergeRooms
     | RemoveRoom
     | AddOpening
@@ -242,6 +254,20 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
                     h=new[3],
                     fill=r.fill,
                     z=r.z,
+                )
+            )
+        elif isinstance(op, AddRoom):
+            g.rooms.append(
+                Room(
+                    id=_unique_id(g.rooms, op.name),
+                    name=op.name,
+                    kind=op.kind or kind_for(op.name),
+                    x=op.x,
+                    y=op.y,
+                    w=op.w,
+                    h=op.h,
+                    fill=op.fill,
+                    z=0,
                 )
             )
         elif isinstance(op, MergeRooms):

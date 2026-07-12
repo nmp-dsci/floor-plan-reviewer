@@ -67,6 +67,13 @@ export default function Inspector({
             + Opening
           </button>
           <button
+            className={tool === 'add-room' ? 'on' : ''}
+            disabled={!atHead}
+            onClick={() => onTool(tool === 'add-room' ? 'select' : 'add-room')}
+          >
+            + Room
+          </button>
+          <button
             className={tool === 'add-fixture' ? 'on' : ''}
             disabled={!atHead}
             onClick={() => onTool(tool === 'add-fixture' ? 'select' : 'add-fixture')}
@@ -77,13 +84,10 @@ export default function Inspector({
         </div>
       </div>
 
-      {room && atHead && (
-        <RoomEditor
-          key={room.id}
-          room={room}
-          onOps={onOps}
-        />
+      {selection.region && atHead && (
+        <RegionEditor key="region" region={selection.region} onOps={onOps} />
       )}
+      {room && atHead && <RoomEditor key={room.id} room={room} onOps={onOps} />}
       {fixture && atHead && <FixtureEditor key={fixture.id} fixture={fixture} onOps={onOps} />}
       {wall && wallSel && atHead && (
         <div className="body inspector-pane">
@@ -190,6 +194,68 @@ export default function Inspector({
   );
 }
 
+function RegionEditor({
+  region,
+  onOps,
+}: {
+  region: { x: number; y: number; w: number; h: number };
+  onOps: (ops: Op[]) => void;
+}) {
+  const [name, setName] = useState('BUTLERS PANTRY');
+  const [kind, setKind] = useState('storage');
+  return (
+    <div className="body inspector-pane">
+      <div className="what">
+        New room here <span className="chip">space</span>{' '}
+        <span className="chip dim">
+          {region.w.toFixed(1)} × {region.h.toFixed(1)}m
+        </span>
+      </div>
+      <div className="frow one">
+        <label className="f">
+          <span>Room name</span>
+          <input value={name} placeholder="e.g. butlers pantry" onChange={(e) => setName(e.target.value)} />
+        </label>
+      </div>
+      <div className="frow">
+        <label className="f">
+          <span>Kind</span>
+          <select value={kind} onChange={(e) => setKind(e.target.value)}>
+            {KINDS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="btnrow">
+        <button
+          className="primary"
+          disabled={!name.trim()}
+          onClick={() =>
+            onOps([
+              {
+                op: 'add_room',
+                name: name.trim(),
+                kind,
+                x: region.x,
+                y: region.y,
+                w: region.w,
+                h: region.h,
+                fill: kind === 'storage' || kind === 'utility' ? 'grey' : 'white',
+              },
+            ])
+          }
+        >
+          Add room
+        </button>
+      </div>
+      <div className="note">Or describe what to build here to the agent below — the space is the target.</div>
+    </div>
+  );
+}
+
 function RoomEditor({ room, onOps }: { room: { id: string; name: string; kind: string; x: number; y: number; w: number; h: number; fill: 'white' | 'grey' }; onOps: (ops: Op[]) => void }) {
   const [name, setName] = useState(room.name);
   const [kind, setKind] = useState(room.kind);
@@ -259,6 +325,26 @@ function RoomEditor({ room, onOps }: { room: { id: string; name: string; kind: s
         <button className="primary" disabled={!dirtyMeta && !dirtyRect} onClick={queue}>
           Queue edit
         </button>
+        <button
+          className="ghost"
+          title="Duplicate this room beside the original (needs free space to apply)"
+          onClick={() =>
+            onOps([
+              {
+                op: 'add_room',
+                name: `${room.name} copy`,
+                kind: room.kind,
+                x: room.x + room.w + 0.15,
+                y: room.y,
+                w: room.w,
+                h: room.h,
+                fill: room.fill,
+              },
+            ])
+          }
+        >
+          Duplicate
+        </button>
         <button className="ghost danger" onClick={() => onOps([{ op: 'remove_room', room_id: room.id }])}>
           Remove room
         </button>
@@ -318,6 +404,24 @@ function FixtureEditor({
           }
         >
           Queue edit
+        </button>
+        <button
+          className="ghost"
+          title="Duplicate this fixture, offset slightly"
+          onClick={() =>
+            onOps([
+              {
+                op: 'add_fixture',
+                x: fixture.x + 0.3,
+                y: fixture.y + 0.3,
+                w: fixture.w,
+                h: fixture.h,
+                label: fixture.label ? `${fixture.label} copy` : '',
+              },
+            ])
+          }
+        >
+          Duplicate
         </button>
         <button
           className="ghost danger"

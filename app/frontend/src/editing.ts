@@ -8,6 +8,16 @@ export type Op =
   | { op: 'rename'; room_id: string; name: string }
   | { op: 'set_kind'; room_id: string; kind?: string; name?: string; fill?: 'white' | 'grey' }
   | { op: 'resize_room'; room_id: string; x: number; y: number; w: number; h: number }
+  | {
+      op: 'add_room';
+      name: string;
+      kind?: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      fill?: 'white' | 'grey';
+    }
   | { op: 'remove_room'; room_id: string }
   | { op: 'add_opening'; wall_id: string; t0: number; t1: number; type: OpeningType }
   | { op: 'modify_opening'; opening_id: string; t0?: number; t1?: number; type?: OpeningType }
@@ -58,6 +68,20 @@ export function applyOpsPreview(geo: PlanGeometry, ops: Op[]): PlanGeometry {
         }
         break;
       }
+      case 'add_room':
+        g.rooms.push({
+          id: `pv-room${++pv}`,
+          name: op.name,
+          kind: op.kind ?? 'room',
+          dims: '',
+          x: op.x,
+          y: op.y,
+          w: op.w,
+          h: op.h,
+          fill: op.fill ?? 'white',
+          z: 0,
+        });
+        break;
       case 'remove_room':
         g.rooms = g.rooms.filter((r) => r.id !== op.room_id);
         break;
@@ -138,6 +162,8 @@ export function describeOp(op: Op): string {
       return `${op.room_id}: ${[op.name, op.kind, op.fill].filter(Boolean).join(' · ')}`;
     case 'resize_room':
       return `resize ${op.room_id} → ${op.w.toFixed(2)} x ${op.h.toFixed(2)}m at (${op.x.toFixed(2)}, ${op.y.toFixed(2)})`;
+    case 'add_room':
+      return `add room ${op.name} ${op.w.toFixed(1)} x ${op.h.toFixed(1)}m`;
     case 'remove_room':
       return `remove room ${op.room_id}`;
     case 'add_opening':

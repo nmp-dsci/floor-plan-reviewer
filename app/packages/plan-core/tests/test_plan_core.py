@@ -192,6 +192,38 @@ def test_modify_and_remove_fixture_by_id(v03) -> None:
     assert any("not found" in w for w in missing.warnings)
 
 
+def test_add_room_creates_valid_room() -> None:
+    from plan_core import PlanGeometry, Room
+
+    # kitchen fills the left; free space on the right becomes a butler's pantry
+    base = PlanGeometry(
+        rooms=[Room(id="kitchen", name="KITCHEN", kind="kitchen", x=0, y=0, w=4.0, h=5.0)],
+        meta={"envelope": [0.0, 0.0, 9.0, 5.0]},
+    )
+    result = apply_ops(
+        base,
+        parse_ops(
+            [
+                {
+                    "op": "add_room",
+                    "name": "BUTLERS PANTRY",
+                    "kind": "storage",
+                    "x": 5.0,
+                    "y": 0.0,
+                    "w": 4.0,
+                    "h": 5.0,
+                }
+            ]
+        ),
+    )
+    errors, _ = validate(result.geometry)
+    assert errors == [], errors
+    made = next(r for r in result.geometry.rooms if "butlers" in r.id)
+    assert made.kind == "storage" and abs(made.w - 4.0) < 1e-6
+    lines = diff_geometries(base, result.geometry)
+    assert any(line.obj == "room" and line.op == "add" and "butlers" in line.id for line in lines)
+
+
 def test_footprint_change_is_rejected() -> None:
     from plan_core import PlanGeometry, Room
 

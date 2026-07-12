@@ -43,6 +43,10 @@ export const api = {
     json<{ deleted: number; head_n: number }>(`/api/reviews/${id}/versions/${n}`, {
       method: 'DELETE',
     }),
+  bookmarkVersion: (id: string, n: number) =>
+    json<{ n: number; saved: boolean }>(`/api/reviews/${id}/versions/${n}/bookmark`, {
+      method: 'POST',
+    }),
   refreshComps: (id: string) =>
     json<{ comps: Comp[] }>(`/api/reviews/${id}/comps/refresh`, { method: 'POST' }),
   planImageUrl: (planId: string) => `/api/plans/${planId}/image`,

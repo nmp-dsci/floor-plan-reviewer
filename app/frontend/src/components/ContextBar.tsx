@@ -10,6 +10,7 @@ interface Props {
   onMode: (m: 'proposed' | 'delta') => void;
   onRefreshComps: () => void;
   onDeleteVersion: (n: number) => void;
+  onBookmark: (n: number) => void;
 }
 
 export default function ContextBar({
@@ -21,6 +22,7 @@ export default function ContextBar({
   onMode,
   onRefreshComps,
   onDeleteVersion,
+  onBookmark,
 }: Props) {
   const head = review.head_n ?? 0;
   const headV = review.versions[review.versions.length - 1];
@@ -66,10 +68,11 @@ export default function ContextBar({
             <button
               key={v.n}
               className={v.n === currentN ? 'active' : ''}
-              title={`$${v.rent.proposed_per_week.toFixed(0)}/wk · ${v.config}`}
+              title={`$${v.rent.proposed_per_week.toFixed(0)}/wk · ${v.config}${v.saved ? ' · bookmarked' : ''}`}
               onClick={() => onVersion(v.n)}
             >
               v{String(v.n).padStart(2, '0')}
+              {v.saved && v.n > 0 ? <span className="star">★</span> : ''}
             </button>
           ))}
         </span>
@@ -111,6 +114,15 @@ export default function ContextBar({
           )
         )}
         <span className="acts">
+          {currentN > 0 && (
+            <button
+              className="linklike bookmark"
+              title="Bookmarked versions survive auto-pruning (only the original and latest are kept otherwise)"
+              onClick={() => onBookmark(currentN)}
+            >
+              {current?.saved ? '★ bookmarked' : '☆ bookmark'}
+            </button>
+          )}
           <a href={api.exportUrl(review.review_id, currentN)} target="_blank" rel="noreferrer">
             ⤓ PNG
           </a>
