@@ -113,9 +113,9 @@
   </header>
 
   <div class="howto">
-    <b>How to review:</b> annotate any paragraph, diagram, mock, or table. Lock the four decisions at
-    the bottom (each has its own queue button), then press <b>Send to Agent</b>. Once locked, this
-    plan gets saved into the repo and Phase 0 starts.
+    <b>Status:</b> decisions D1–D4 locked 2026-07-12 — spec saved to
+    <code>ai_specs/s01_floorplan-studio-plan.md</code> and pushed to the repo. Annotations are
+    still welcome; Phase 0 (scaffold) is the next unit of work.
   </div>
 
   <section class="card">
@@ -448,82 +448,25 @@ sequenceDiagram
     </div>
   </section>
 
-  <section class="card decision">
-    <h2>Decision D1 — where does the app live?</h2>
-    <form class="dbody" data-lavish-question="d1-location"
-      onsubmit="event.preventDefault();
-        const v = new FormData(event.currentTarget).get('d1'); if (!v) return;
-        window.lavish.queuePrompt('Lock D1 (app location): ' + v, { tag: 'choice',
-          text: 'D1: ' + v, element: event.currentTarget, queueKey: 'd1',
-          data: { question: 'd1-location', answer: v } });
-        this.querySelector('.queued').textContent = 'Queued: ' + v;">
-      <label><input type="radio" name="d1" value="app/ subfolder of floor-plan-reviewer (recommended)"/>
-        <span class="opt"><b>app/ in this repo (Recommended)</b><span>One repo, one story: chat workflow + app share plan-core and the property folders. Matches the portfolio's one-project-one-repo rule.</span></span></label>
-      <label><input type="radio" name="d1" value="new sibling repo floor-plan-studio"/>
-        <span class="opt"><b>New sibling repo</b><span>Cleaner separation, but duplicates geometry/renderer code or forces packaging it.</span></span></label>
-      <button type="submit">Queue D1</button><div class="queued">Nothing queued.</div>
-    </form>
-  </section>
-
-  <section class="card decision">
-    <h2>Decision D2 — plan canvas technology</h2>
-    <form class="dbody" data-lavish-question="d2-canvas"
-      onsubmit="event.preventDefault();
-        const v = new FormData(event.currentTarget).get('d2'); if (!v) return;
-        window.lavish.queuePrompt('Lock D2 (canvas tech): ' + v, { tag: 'choice',
-          text: 'D2: ' + v, element: event.currentTarget, queueKey: 'd2',
-          data: { question: 'd2-canvas', answer: v } });
-        this.querySelector('.queued').textContent = 'Queued: ' + v;">
-      <label><input type="radio" name="d2" value="d3 + SVG (recommended)"/>
-        <span class="opt"><b>d3 + SVG (Recommended)</b><span>Every room/wall is a DOM node — selection, hover, a11y, and diff colouring are native. Plans are small (tens of objects), so SVG performance is a non-issue.</span></span></label>
-      <label><input type="radio" name="d2" value="canvas engine (Konva/Pixi)"/>
-        <span class="opt"><b>Canvas engine (Konva/Pixi)</b><span>Only pays off at thousands of objects; hit-testing and text handling cost more code.</span></span></label>
-      <label><input type="radio" name="d2" value="keep PNG + hotspot overlays"/>
-        <span class="opt"><b>PNG + hotspots (status quo)</b><span>No wall chunks, no real diff view — falls short of the brief.</span></span></label>
-      <button type="submit">Queue D2</button><div class="queued">Nothing queued.</div>
-    </form>
-  </section>
-
-  <section class="card decision">
-    <h2>Decision D3 — backend &amp; agent stack</h2>
-    <form class="dbody" data-lavish-question="d3-stack"
-      onsubmit="event.preventDefault();
-        const v = new FormData(event.currentTarget).get('d3'); if (!v) return;
-        window.lavish.queuePrompt('Lock D3 (backend/agent stack): ' + v, { tag: 'choice',
-          text: 'D3: ' + v, element: event.currentTarget, queueKey: 'd3',
-          data: { question: 'd3-stack', answer: v } });
-        this.querySelector('.queued').textContent = 'Queued: ' + v;">
-      <label><input type="radio" name="d3" value="FastAPI + Pydantic AI (recommended, mirrors data-qa-agent)"/>
-        <span class="opt"><b>FastAPI + Pydantic AI (Recommended)</b><span>Mirrors data-qa-agent (its locked decision F) — typed tools for geometry ops, model-swappable, uv/ruff/mypy conventions already in this repo.</span></span></label>
-      <label><input type="radio" name="d3" value="FastAPI + raw Anthropic SDK"/>
-        <span class="opt"><b>FastAPI + raw Anthropic SDK</b><span>Fewer deps, hand-rolled tool loop — more code to own for the same result.</span></span></label>
-      <label><input type="radio" name="d3" value="Node/Express + Claude Agent SDK"/>
-        <span class="opt"><b>Node + Claude Agent SDK</b><span>One language with the frontend, but breaks reuse of plan-core/Pillow and the sibling's infra patterns.</span></span></label>
-      <button type="submit">Queue D3</button><div class="queued">Nothing queued.</div>
-    </form>
-  </section>
-
-  <section class="card decision">
-    <h2>Decision D4 — persistence from day 0</h2>
-    <form class="dbody" data-lavish-question="d4-persistence"
-      onsubmit="event.preventDefault();
-        const v = new FormData(event.currentTarget).get('d4'); if (!v) return;
-        window.lavish.queuePrompt('Lock D4 (persistence): ' + v, { tag: 'choice',
-          text: 'D4: ' + v, element: event.currentTarget, queueKey: 'd4',
-          data: { question: 'd4-persistence', answer: v } });
-        this.querySelector('.queued').textContent = 'Queued: ' + v;">
-      <label><input type="radio" name="d4" value="Postgres in docker-compose from P0 (recommended)"/>
-        <span class="opt"><b>Postgres from P0 (Recommended)</b><span>Same engine local and on AWS (RDS/Aurora) — no migration surprises; compose makes it free locally.</span></span></label>
-      <label><input type="radio" name="d4" value="SQLite first, Postgres at P6"/>
-        <span class="opt"><b>SQLite first</b><span>Slightly lighter start, guaranteed rework at deploy time.</span></span></label>
-      <button type="submit">Queue D4</button><div class="queued">Nothing queued.</div>
-    </form>
+  <section class="card">
+    <h2>Locked decisions <small>approved in this review, 2026-07-12</small></h2>
+    <div class="body">
+      <table class="spec">
+        <tr><th>#</th><th>Decision</th><th>Locked choice</th></tr>
+        <tr><td>D1</td><td>App location</td><td><code>app/</code> subfolder of floor-plan-reviewer — one repo, shared plan-core and property folders</td></tr>
+        <tr><td>D2</td><td>Plan canvas</td><td><b>d3 + SVG</b> — geometry-native selection, hover, and diff colouring</td></tr>
+        <tr><td>D3</td><td>Backend &amp; agent</td><td><b>FastAPI + Pydantic AI</b> — mirrors data-qa-agent's locked decision F; Claude, model config-swappable</td></tr>
+        <tr><td>D4</td><td>Persistence</td><td><b>Postgres in docker-compose from P0</b> — same engine as AWS RDS/Aurora later</td></tr>
+      </table>
+      <p style="margin-top:10px">Spec saved to <code>ai_specs/s01_floorplan-studio-plan.md</code>.
+        The one deliberately open question remains auth at P6 (Cognito vs Entra External ID).</p>
+    </div>
   </section>
 
   <footer>
-    Plan for review — no code exists yet. On approval this gets saved to the repo (ai-spec style) and
-    Phase 0 begins · Stack claims verified against data-qa-agent/AGENTS.md and this repo's scripts/ ·
-    floor-plan-reviewer, 2026-07-12.
+    Plan APPROVED 2026-07-12 — D1–D4 locked · spec: ai_specs/s01_floorplan-studio-plan.md · next:
+    Phase 0 scaffold · Stack claims verified against data-qa-agent/AGENTS.md and this repo's
+    scripts/ · floor-plan-reviewer.
   </footer>
 </div>
 

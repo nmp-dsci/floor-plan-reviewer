@@ -285,4 +285,7 @@ questions; new wet areas need waterproofing certification and drainage runs. Alw
 3. Dual-occupancy module (second kitchen + separate entry) as an opt-in scope stipulation.
 4. Optional cost/ROI overlay (decision J revisited) and budget caps.
 5. Styled-plan renderer polish: door swing arcs, window breaks, compass, site-plan panel.
-6. Graduate the proven workflow into a standalone Pydantic AI app with evals over past properties.
+6. **Floor-Plan Studio web app** — plan APPROVED 2026-07-12, spec in
+   [`ai_specs/s01_floorplan-studio-plan.md`](./ai_specs/s01_floorplan-studio-plan.md): `app/`
+   subfolder, React + d3 SVG canvas, FastAPI + Pydantic AI, Postgres, phases P0–P6 ending in AWS
+   App Runner like data-qa-agent.
