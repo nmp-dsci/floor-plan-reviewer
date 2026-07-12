@@ -69,6 +69,8 @@ def _version_summary(v: Version) -> dict[str, Any]:
         "rent": v.rent,
         "changes": v.changes,
         "config": geo.summary_config(),
+        "internal_area": round(geo.internal_area(), 1),
+        "total_area": round(geo.total_area(), 1),
         "created_at": v.created_at.isoformat(),
     }
 
@@ -387,6 +389,31 @@ def apply_edits(review_id: str, batch: EditBatch) -> dict[str, Any]:
         },
     )
     return {"n": new_n, "warnings": result.warnings + warnings}
+
+
+@app.delete("/api/reviews/{review_id}/versions/{n}")
+def delete_version(review_id: str, n: int) -> dict[str, Any]:
+    """Roll back by deleting the head version (n>0). n-1 becomes the editable head.
+    Only the head is deletable, so history stays linear."""
+    with session() as db:
+        review = db.get(Review, review_id)
+        if not review:
+            raise HTTPException(404, "review not found")
+        versions = _versions(db, review_id)
+        head = versions[-1]
+        if n != head.n:
+            raise HTTPException(409, f"only the head (v{head.n}) can be deleted, not v{n}")
+        if n == 0:
+            raise HTTPException(422, "the original version cannot be deleted")
+        if _job_running(db, review_id):
+            raise HTTPException(409, "an agent job is running — wait for it to finish")
+        db.delete(head)
+        db.commit()
+        new_head = n - 1
+    hub.publish(
+        review_id, {"type": "version.deleted", "n": n, "head_n": new_head}
+    )
+    return {"deleted": n, "head_n": new_head}
 
 
 @app.get("/api/reviews/{review_id}/registers")

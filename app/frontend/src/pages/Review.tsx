@@ -16,7 +16,7 @@ import type {
   Tool,
   VersionDetail,
 } from '../types';
-import { emptySelection } from '../types';
+import { emptySelection, hasSelection } from '../types';
 
 interface Props {
   reviewId: string;
@@ -44,6 +44,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
     }
   });
   const [busy, setBusy] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
   const [banner, setBanner] = useState<{ kind: 'busy' | 'error' | 'ok'; text: string } | null>(null);
   const currentNRef = useRef<number | null>(null);
   currentNRef.current = currentN;
@@ -105,6 +106,16 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
           });
           loadReview(true).catch(() => undefined);
           onVersionAdded?.();
+        } else if (ev.type === 'version.deleted') {
+          setBusy(false);
+          setPending([]);
+          setSelection(emptySelection());
+          setBanner({
+            kind: 'ok',
+            text: `v${String(ev.n).padStart(2, '0')} deleted — v${String(ev.head_n).padStart(2, '0')} is now editable.`,
+          });
+          loadReview(true).catch(() => undefined);
+          onVersionAdded?.();
         } else if (ev.type === 'job.error') {
           setBusy(false);
           setBanner({ kind: 'error', text: `Agent failed: ${ev.error}` });
@@ -112,6 +123,30 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
       }),
     [reviewId, loadReview, onVersionAdded],
   );
+
+  // Delete / Backspace removes the selected objects (as pending remove ops).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const t = e.target as HTMLElement | null;
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if (review === null || currentN !== review.head_n) return;
+      if (!hasSelection(selection)) return;
+      e.preventDefault();
+      const ops: Op[] = [
+        ...selection.rooms.map((id) => ({ op: 'remove_room', room_id: id }) as Op),
+        ...selection.fixtures.map((id) => ({ op: 'remove_fixture', fixture_id: id }) as Op),
+        ...selection.openings.map((o) => ({ op: 'remove_opening', opening_id: o.id }) as Op),
+        ...selection.walls.map(
+          (w) => ({ op: 'remove_wall_chunk', wall_id: w.id, t0: w.t0, t1: w.t1 }) as Op,
+        ),
+      ];
+      setPending((p) => [...p, ...ops]);
+      setSelection(emptySelection());
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selection, currentN, review]);
 
   if (!review || currentN === null || !detail) {
     return <div className="banner">Loading review…</div>;
@@ -165,12 +200,33 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
     });
   };
 
+  const deleteVersion = (n: number) => {
+    setBusy(true);
+    setBanner({ kind: 'busy', text: `Deleting v${String(n).padStart(2, '0')}…` });
+    api
+      .deleteVersion(reviewId, n)
+      .then((res) => {
+        setBusy(false);
+        setBanner({
+          kind: 'ok',
+          text: `v${String(res.deleted).padStart(2, '0')} deleted — v${String(res.head_n).padStart(2, '0')} is now editable.`,
+        });
+        return loadReview(true);
+      })
+      .then(() => onVersionAdded?.())
+      .catch((e) => {
+        setBusy(false);
+        setBanner({ kind: 'error', text: friendly(e) });
+      });
+  };
+
   return (
     <>
       <ContextBar
         review={review}
         currentN={currentN}
         mode={mode}
+        busy={busy}
         onVersion={(n) => {
           setCurrentN(n);
           setPending([]);
@@ -183,6 +239,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
             .then(() => loadReview(false))
             .catch((e) => setBanner({ kind: 'error', text: friendly(e) }))
         }
+        onDeleteVersion={deleteVersion}
       />
 
       {banner && <div className={`banner ${banner.kind === 'ok' ? '' : banner.kind}`}>{banner.text}</div>}
@@ -264,9 +321,13 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
           <div className="card">
             <h2>
               <span>Change register</span>
-              <small>git-style, generated from the geometry diff</small>
+              {allHunks.length > 1 && (
+                <button className="ghost register-toggle" onClick={() => setRegisterOpen((o) => !o)}>
+                  {registerOpen ? 'collapse ▲' : `expand all (${allHunks.length}) ▾`}
+                </button>
+              )}
             </h2>
-            <Register hunks={allHunks} />
+            <Register hunks={allHunks} open={registerOpen} />
           </div>
 
           <div className="card">

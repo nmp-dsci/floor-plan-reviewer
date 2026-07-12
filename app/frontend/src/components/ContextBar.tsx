@@ -5,18 +5,33 @@ interface Props {
   review: Review;
   currentN: number;
   mode: 'proposed' | 'delta';
+  busy: boolean;
   onVersion: (n: number) => void;
   onMode: (m: 'proposed' | 'delta') => void;
   onRefreshComps: () => void;
+  onDeleteVersion: (n: number) => void;
 }
 
-export default function ContextBar({ review, currentN, mode, onVersion, onMode, onRefreshComps }: Props) {
+export default function ContextBar({
+  review,
+  currentN,
+  mode,
+  busy,
+  onVersion,
+  onMode,
+  onRefreshComps,
+  onDeleteVersion,
+}: Props) {
   const head = review.head_n ?? 0;
   const headV = review.versions[review.versions.length - 1];
   const baseline = review.baseline_per_week;
   const proposed = headV ? headV.rent.proposed_per_week : baseline;
   const uplift = proposed - baseline;
   const current = review.versions.find((v) => v.n === currentN);
+  const internal = current?.internal_area;
+  const total = current?.total_area;
+  // "size of opportunity": interior not yet assigned to habitable rooms
+  const opportunity = internal !== undefined && total !== undefined ? total - internal : undefined;
 
   return (
     <div className="ctxbar-wrap">
@@ -25,6 +40,17 @@ export default function ContextBar({ review, currentN, mode, onVersion, onMode, 
           {review.plan.address || review.plan.slug} — v{String(currentN).padStart(2, '0')}
         </span>
         <span className="cfg">{current?.config}</span>
+        {internal !== undefined && total !== undefined && (
+          <span className="areas" title="Habitable internal area vs the fixed envelope footprint">
+            <span className="mono">
+              <b>{internal.toFixed(0)}</b> m² internal
+            </span>
+            <span className="mono faintsep">/ {total.toFixed(0)} m² envelope</span>
+            {opportunity !== undefined && opportunity > 0.5 && (
+              <span className="mono opp">{opportunity.toFixed(0)} m² to unlock</span>
+            )}
+          </span>
+        )}
         <span className="rent">
           <span className="mono">${baseline.toFixed(0)}/wk</span>
           <span className="arrow">→</span>
@@ -55,13 +81,34 @@ export default function ContextBar({ review, currentN, mode, onVersion, onMode, 
             Delta
           </button>
         </span>
-        {currentN !== head && (
+        {currentN !== head ? (
           <span className="readonly">
             read-only — viewing v{String(currentN).padStart(2, '0')} of v{String(head).padStart(2, '0')}
             <button className="ghost" onClick={() => onVersion(head)}>
               jump to head
             </button>
+            {head > 0 && (
+              <button
+                className="ghost danger"
+                disabled={busy}
+                title={`Delete head v${String(head).padStart(2, '0')} — rolls back to v${String(head - 1).padStart(2, '0')}`}
+                onClick={() => onDeleteVersion(head)}
+              >
+                delete v{String(head).padStart(2, '0')}
+              </button>
+            )}
           </span>
+        ) : (
+          head > 0 && (
+            <button
+              className="ghost danger delver"
+              disabled={busy}
+              title={`Delete this version — rolls back to editable v${String(head - 1).padStart(2, '0')}`}
+              onClick={() => onDeleteVersion(head)}
+            >
+              delete v{String(head).padStart(2, '0')}
+            </button>
+          )
         )}
         <span className="acts">
           <a href={api.exportUrl(review.review_id, currentN)} target="_blank" rel="noreferrer">

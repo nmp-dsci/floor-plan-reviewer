@@ -1,12 +1,24 @@
 import type { RegisterHunk } from '../types';
 
-export default function Register({ hunks }: { hunks: { version: number; hunk: RegisterHunk }[] }) {
+interface Props {
+  hunks: { version: number; hunk: RegisterHunk }[];
+  open: boolean;
+}
+
+export default function Register({ hunks, open }: Props) {
   if (hunks.length === 0) {
-    return <div className="body" style={{ color: 'var(--faint)', fontSize: 13 }}>No changes yet — this is the original plan.</div>;
+    return (
+      <div className="body" style={{ color: 'var(--faint)', fontSize: 13 }}>
+        No changes yet — this is the original plan.
+      </div>
+    );
   }
+  // hunks are latest-first; collapsed shows just the most recent one.
+  const shown = open ? hunks : hunks.slice(0, 1);
+  const hidden = hunks.length - shown.length;
   return (
     <div className="body">
-      {hunks.map(({ version, hunk }) => {
+      {shown.map(({ version, hunk }) => {
         const author = hunk.author ?? 'agent';
         return (
           <div key={`${version}-${hunk.id}`}>
@@ -26,6 +38,11 @@ export default function Register({ hunks }: { hunks: { version: number; hunk: Re
           </div>
         );
       })}
+      {!open && hidden > 0 && (
+        <div className="register-more">
+          {hidden} older change{hidden === 1 ? '' : 's'} hidden — expand to view
+        </div>
+      )}
     </div>
   );
 }

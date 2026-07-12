@@ -206,7 +206,17 @@ class PlanGeometry(BaseModel):
         return (xs0, ys0, xs1, ys1)
 
     def internal_area(self) -> float:
+        """Habitable internal area: z=0 rooms, excluding grey (non-habitable) space."""
         return sum(r.area for r in self.rooms if r.z == 0 and r.fill != "grey")
+
+    def laid_out_area(self) -> float:
+        """Every z=0 room, habitable or not — the interior actually assigned to rooms."""
+        return sum(r.area for r in self.rooms if r.z == 0)
+
+    def total_area(self) -> float:
+        """The external envelope footprint (width x length) in square metres."""
+        x0, y0, x1, y1 = self.envelope()
+        return (x1 - x0) * (y1 - y0)
 
     def summary_config(self) -> str:
         beds = sum(1 for r in self.rooms if r.kind == "bedroom")

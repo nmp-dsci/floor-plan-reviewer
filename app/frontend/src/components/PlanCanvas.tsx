@@ -155,12 +155,15 @@ export default function PlanCanvas({
     [interactive, multi, onSelectionChange, selection],
   );
 
-  const toggleWall = useCallback(
-    (wall: Wall, additive: boolean) => {
+  // Select a wall chunk. When a wall carries openings, clicking picks the SOLID
+  // segment (the "side") flanking the click point, so each side is editable on its
+  // own; a wall with no openings selects whole.
+  const selectWallChunk = useCallback(
+    (wall: Wall, t0: number, t1: number, additive: boolean) => {
       if (!interactive) return;
-      if (tool === 'add-opening' && editable) return; // handled by placeOpening
+      const whole = t0 <= 0.001 && t1 >= 0.999;
       const has = selection.walls.some((w) => w.id === wall.id);
-      const entry: WallSelection = { id: wall.id, t0: 0, t1: 1, whole: true };
+      const entry: WallSelection = { id: wall.id, t0, t1, whole };
       if (additive || multi) {
         onSelectionChange({
           ...selection,
@@ -171,13 +174,13 @@ export default function PlanCanvas({
       } else {
         onSelectionChange({
           rooms: [],
-          walls: has && selection.walls.length === 1 ? [] : [entry],
+          walls: has && selection.walls.length === 1 && selection.walls[0].whole === whole ? [] : [entry],
           fixtures: [],
           openings: [],
         });
       }
     },
-    [editable, interactive, multi, onSelectionChange, selection, tool],
+    [interactive, multi, onSelectionChange, selection],
   );
 
   const selectOpening = useCallback(
@@ -415,7 +418,18 @@ export default function PlanCanvas({
                   strokeWidth={2.5}
                   strokeDasharray="8 5"
                 />
-                <text x={X(r.x) + 6} y={Y(r.y) + 15} fontSize={11} fill={RED} fontWeight={700}>
+                {/* removed labels sit at the BOTTOM so they never collide with an added
+                    room's label at the same top-left corner; white halo keeps them legible */}
+                <text
+                  x={X(r.x) + 6}
+                  y={Y(r.y + r.h) - 5}
+                  fontSize={11}
+                  fill={RED}
+                  fontWeight={700}
+                  stroke="#fff"
+                  strokeWidth={3.2}
+                  paintOrder="stroke"
+                >
                   − {r.name}
                 </text>
               </g>
@@ -434,7 +448,16 @@ export default function PlanCanvas({
                     stroke={GREEN}
                     strokeWidth={2.5}
                   />
-                  <text x={X(r.x) + 6} y={Y(r.y) + 15} fontSize={11} fill={GREEN} fontWeight={700}>
+                  <text
+                    x={X(r.x) + 6}
+                    y={Y(r.y) + 14}
+                    fontSize={11}
+                    fill={GREEN}
+                    fontWeight={700}
+                    stroke="#fff"
+                    strokeWidth={3.2}
+                    paintOrder="stroke"
+                  >
                     + {r.name}
                   </text>
                 </g>
@@ -456,7 +479,16 @@ export default function PlanCanvas({
                     strokeDasharray="3 3"
                   />
                   {was.name !== r.name && (
-                    <text x={X(r.x) + 6} y={Y(r.y + r.h) - 7} fontSize={10.5} fill={AMBER} fontWeight={700}>
+                    <text
+                      x={X(r.x) + 6}
+                      y={Y(r.y) + 14}
+                      fontSize={10.5}
+                      fill={AMBER}
+                      fontWeight={700}
+                      stroke="#fff"
+                      strokeWidth={3.2}
+                      paintOrder="stroke"
+                    >
                       {was.name} → {r.name}
                     </text>
                   )}
@@ -548,8 +580,14 @@ export default function PlanCanvas({
                   onClick={(e) => {
                     e.stopPropagation();
                     cancelPress();
-                    if (tool === 'add-opening' && editable) placeOpening(w, e.clientX, e.clientY);
-                    else toggleWall(w, e.shiftKey);
+                    if (tool === 'add-opening' && editable) {
+                      placeOpening(w, e.clientX, e.clientY);
+                      return;
+                    }
+                    const { mx, my } = toMetres(e.clientX, e.clientY);
+                    const t = absToT(w, wallIsVertical(w) ? my : mx);
+                    const [s0, s1] = solidSegmentAt(w, t);
+                    selectWallChunk(w, s0, s1, e.shiftKey);
                   }}
                 >
                   <title>{`${w.a} ↔ ${w.b}`}</title>
@@ -835,6 +873,20 @@ function SelectableRect({
       )}
     </g>
   );
+}
+
+/** The solid wall segment (t0,t1) containing t, bounded by adjacent openings.
+ * A wall with no openings yields the whole span [0,1]. */
+function solidSegmentAt(wall: Wall, t: number): [number, number] {
+  const edges = wall.openings
+    .map((o): [number, number] => [Math.min(o.t0, o.t1), Math.max(o.t0, o.t1)])
+    .sort((a, b) => a[0] - b[0]);
+  let lo = 0;
+  for (const [a, b] of edges) {
+    if (t < a) return [lo, a];
+    lo = b;
+  }
+  return [lo, 1];
 }
 
 function WallRect({ wall, X, Y }: { wall: Wall; X: (m: number) => number; Y: (m: number) => number }) {

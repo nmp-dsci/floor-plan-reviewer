@@ -39,6 +39,10 @@ export const api = {
     }),
   registers: (id: string) =>
     json<{ n: number; register: RegisterHunk[] }[]>(`/api/reviews/${id}/registers`),
+  deleteVersion: (id: string, n: number) =>
+    json<{ deleted: number; head_n: number }>(`/api/reviews/${id}/versions/${n}`, {
+      method: 'DELETE',
+    }),
   refreshComps: (id: string) =>
     json<{ comps: Comp[] }>(`/api/reviews/${id}/comps/refresh`, { method: 'POST' }),
   planImageUrl: (planId: string) => `/api/plans/${planId}/image`,
@@ -70,6 +74,7 @@ export const api = {
 export type StudioEvent =
   | { type: 'job.status'; job_id: string; status: string }
   | { type: 'version.ready'; n: number; job_id: string; warnings: string[] }
+  | { type: 'version.deleted'; n: number; head_n: number }
   | { type: 'job.error'; job_id: string; error: string };
 
 export function subscribe(reviewId: string, onEvent: (e: StudioEvent) => void): () => void {

@@ -85,6 +85,8 @@ export interface VersionSummary {
   rent: Rent;
   changes: Change[];
   config: string;
+  internal_area?: number;
+  total_area?: number;
   created_at: string;
 }
 

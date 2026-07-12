@@ -192,6 +192,19 @@ def test_modify_and_remove_fixture_by_id(v03) -> None:
     assert any("not found" in w for w in missing.warnings)
 
 
+def test_footprint_change_is_rejected() -> None:
+    from plan_core import PlanGeometry, Room
+
+    room = Room(id="hall", name="HALL", kind="circulation", x=0, y=0, w=10.0, h=8.0)
+    # envelope 1.2 m wider than the rooms fill → footprint shrank → rejected
+    shrunk = PlanGeometry(rooms=[room], meta={"envelope": [0.0, 0.0, 11.2, 8.0]})
+    errors, _ = validate(shrunk)
+    assert any("footprint width" in e for e in errors), errors
+    # matching envelope → no footprint error
+    ok = PlanGeometry(rooms=[room], meta={"envelope": [0.0, 0.0, 10.0, 8.0]})
+    assert not any("footprint" in e for e in validate(ok)[0])
+
+
 def test_change_author_defaults_to_agent_and_lands_in_hunk(v03) -> None:
     lines = diff_geometries(v03, v03)
     agent_hunk = register_hunk(Change(id="c01", title="agent change"), lines)

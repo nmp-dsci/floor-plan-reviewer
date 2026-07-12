@@ -15,6 +15,10 @@ ENVELOPE_TOL = 0.06
 OVERLAP_TOL = 0.05
 MIN_ROOM = 0.7
 MIN_NESTED = 0.45
+# The overall footprint (bounding box of z=0 rooms) must keep the pinned envelope's
+# width and length — the external boundary can neither grow NOR shrink. Catches an
+# agent quietly restretching the plan (e.g. garage 10.8 m → 12.0 m).
+FOOTPRINT_TOL = 0.12
 
 
 def validate(geo: PlanGeometry) -> tuple[list[str], list[str]]:
@@ -26,6 +30,25 @@ def validate(geo: PlanGeometry) -> tuple[list[str], list[str]]:
         errors.append(f"duplicate room id '{dup}'")
 
     ex0, ey0, ex1, ey1 = geo.envelope()
+
+    # footprint width/length must match the pinned envelope (immutable external boundary)
+    z0_rooms = [r for r in geo.rooms if r.z == 0]
+    if z0_rooms and geo.meta.get("envelope"):
+        bx0 = min(r.x for r in z0_rooms)
+        by0 = min(r.y for r in z0_rooms)
+        bx1 = max(r.x2 for r in z0_rooms)
+        by1 = max(r.y2 for r in z0_rooms)
+        if abs((bx1 - bx0) - (ex1 - ex0)) > FOOTPRINT_TOL:
+            errors.append(
+                f"footprint width changed to {bx1 - bx0:.2f}m "
+                f"(envelope is {ex1 - ex0:.2f}m) — the external boundary is immutable"
+            )
+        if abs((by1 - by0) - (ey1 - ey0)) > FOOTPRINT_TOL:
+            errors.append(
+                f"footprint length changed to {by1 - by0:.2f}m "
+                f"(envelope is {ey1 - ey0:.2f}m) — the external boundary is immutable"
+            )
+
     for r in geo.rooms:
         if r.w <= 0 or r.h <= 0:
             errors.append(f"room '{r.id}' has non-positive size")
