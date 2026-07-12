@@ -1,0 +1,6 @@
+[project]
+name = "floor-plan-studio-demo"
+version = "0.1.0"
+description = "Records the Floor-Plan Studio walkthrough video with Playwright."
+requires-python = ">=3.11"
+dependencies = ["playwright>=1.49"]

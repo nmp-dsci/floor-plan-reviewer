@@ -58,6 +58,31 @@ Renders can also be run by hand:
 uv run python scripts/render_overlay.py 12-example-st/changes_v01.json
 ```
 
+## The app — Floor-Plan Studio
+
+The chat workflow above is also a local-first web app (`app/` — phases P0–P5 of
+[`ai_specs/s01_floorplan-studio-plan.md`](./ai_specs/s01_floorplan-studio-plan.md)):
+
+```bash
+cp app/.env.example app/.env    # add DEEPSEEK_API_KEY (+ ANTHROPIC_API_KEY for vision ingest)
+make -C app up                  # docker compose: frontend + backend-api + plan-agent + Postgres
+open http://localhost:5175
+```
+
+- The plan is a **shape object**: every room and wall is a selectable SVG node (d3). Click a room,
+  click a wall (drag the handles to pick a chunk), long-press or shift-click to multi-select.
+- Comments queue into a change list; **Send** hands them to a Pydantic AI agent (DeepSeek by
+  default, per spec D5) that edits geometry only through typed, validated operations — the
+  envelope is unbreakable.
+- Every version shows a **computed delta view** (green added / red removed / amber modified) and a
+  **git-style change register** generated from the geometry diff, with rent impact and NSW
+  advisory flags per hunk.
+- Upload any listing floor-plan image and the Claude vision agent drafts the geometry for review
+  (P4); rent comps refresh live via Tavily (P5); every version exports the styled PNG.
+
+Demo walkthrough (real session on 231 Peats Ferry Rd): `app/demo/artifacts/walkthrough.mp4` —
+see [`app/demo/DEMO.md`](./app/demo/DEMO.md) for the narrated script.
+
 ## Project boundaries
 
 - The land boundary, external walls, and roofline are **immutable** unless a property's `scope.md`

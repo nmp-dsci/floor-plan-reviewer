@@ -1,7 +1,9 @@
 # Floor-Plan Studio — web app build spec
 
-**Status: APPROVED 2026-07-12** (lavish review `.lavish/s01_floorplan-studio-plan.html`; decisions
-D1–D4 locked by owner). This spec is self-contained: a developer/agent can implement from it.
+**Status: P0–P5 IMPLEMENTED 2026-07-12** (approved same day via lavish review
+`.lavish/s01_floorplan-studio-plan.html`; decisions D1–D5 locked by owner). The app lives in
+`app/` — `make -C app up`. P6 (AWS) remains open. This spec is self-contained: a developer/agent
+can implement from it.
 
 ## Goal
 

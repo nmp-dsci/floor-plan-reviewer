@@ -1,0 +1,96 @@
+{
+  "property": "231-peats-ferry-rd",
+  "address": "231 Peats Ferry Road, Hornsby",
+  "baseline_per_week": 900,
+  "original": "original_v1.json",
+  "image": "original.png",
+  "comps": [
+    { "address": "26 Dural Street, Hornsby", "config": "5b/2b/1c", "rent_per_week": 1180, "source": "rent.com.au, accessed 2026-07-12" },
+    { "address": "55 Mittabah Road, Asquith", "config": "5b/2b/1c", "rent_per_week": 1290, "source": "rent.com.au, accessed 2026-07-12" },
+    { "address": "35 Janet Avenue, Thornleigh", "config": "5b/2b/2c", "rent_per_week": 1450, "source": "rent.com.au, accessed 2026-07-12" },
+    { "address": "46 Kooringal Avenue, Thornleigh", "config": "4b/3b/2c", "rent_per_week": 1250, "source": "rent.com.au, accessed 2026-07-12" },
+    { "address": "472 Somerville Road, Hornsby Heights", "config": "4b/2b/2c", "rent_per_week": 1295, "source": "rent.com.au, accessed 2026-07-12" }
+  ],
+  "versions": [
+    {
+      "n": 1,
+      "plan": "plan_v01.json",
+      "rent": 1000,
+      "changes": [
+        {
+          "id": "c01",
+          "title": "Tandem garage → Bed 4 + walk-in robe + ensuite",
+          "rationale": "Largest single lever: 32.4 m² of street-fronting floor area moves the property from the 3b/1b comp pool into 4b/2b in one step.",
+          "rent_impact_per_week": 100,
+          "flags": [
+            "DA likely — change of use + covered-parking loss (Hornsby DCP)",
+            "New street-facing windows for light/ventilation",
+            "Slab damp-proofing + insulation (BASIX)",
+            "Remote ensuite drainage — hydraulic advice"
+          ]
+        }
+      ]
+    },
+    {
+      "n": 2,
+      "plan": "plan_v02.json",
+      "rent": 1040,
+      "changes": [
+        {
+          "id": "c02",
+          "title": "Enclose balcony → new living area, opened to kitchen/dining",
+          "rationale": "Banks 21.8 m² under the existing roofline and replaces the living amenity the Bed 5 conversion takes.",
+          "rent_impact_per_week": 40,
+          "flags": [
+            "Structural engineer first — load-bearing wall opening",
+            "Former balcony floor: waterproofing + insulation",
+            "Borrowed light check for dining/kitchen",
+            "External stair absorbed — egress"
+          ]
+        }
+      ]
+    },
+    {
+      "n": 3,
+      "plan": "plan_v03.json",
+      "rent": 1260,
+      "changes": [
+        {
+          "id": "c03",
+          "title": "Lounge → Bed 5 (hall strip retained)",
+          "rationale": "With the enclosed balcony as living space, the lounge converts to a 5th bedroom — the jump into the 5-bed comp band.",
+          "rent_impact_per_week": 120,
+          "flags": ["Exempt-level partition work", "Smoke alarms for the extra bedroom"]
+        },
+        {
+          "id": "c04",
+          "title": "Bed 1 second master: hall absorbed, ensuite + WIR",
+          "rationale": "Two master bedrooms differentiate against every local 5-bed comp.",
+          "rent_impact_per_week": 60,
+          "flags": ["CDC plausible", "South drainage run — hydraulic advice", "Linen storage lost"]
+        },
+        {
+          "id": "c05",
+          "title": "Bed 2 corner walk-in robe",
+          "rationale": "Owner-directed: walk-in access for Beds 1 and 2.",
+          "rent_impact_per_week": 5,
+          "flags": ["Joinery — exempt"]
+        },
+        {
+          "id": "c06",
+          "title": "L-bath + second WC",
+          "rationale": "Second WC pocket behind the existing WC; wet zone reads L-shaped.",
+          "rent_impact_per_week": 15,
+          "flags": ["On the east wet stack — CDC + waterproofing"]
+        },
+        {
+          "id": "c07",
+          "title": "Butler's pantry, island bench, cabinetry; laundry outside access",
+          "rationale": "Professional-feel kitchen along the laundry wall.",
+          "rent_impact_per_week": 20,
+          "flags": ["Joinery — exempt"]
+        }
+      ]
+    }
+  ]
+}

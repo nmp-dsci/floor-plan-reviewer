@@ -19,6 +19,9 @@ rendering each impact as an annotated `propose_v##.png`.
 - **Render:** `uv run python scripts/render_overlay.py <folder>/changes_v##.json`
 - **Setup / quality:** `uv sync` · `uv run ruff format . && uv run ruff check . --fix` ·
   `uv run mypy scripts`
+- **Floor-Plan Studio app (`app/`):** `make -C app up` (compose: frontend :5173, backend :8090,
+  agent :8091, Postgres) · `make -C app test` · `make -C app smoke` · `make -C app demo` (records
+  the Playwright walkthrough) — spec: `ai_specs/s01_floorplan-studio-plan.md`
 - **Never:** touch the external envelope/boundary/roofline unless `scope.md` stipulates · propose
   outside the locked `scope.md` · quote rent without ≥ 3 cited live comps (pause if no web access) ·
   modify `original.png` · revise anything but the latest version
