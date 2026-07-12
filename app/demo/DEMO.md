@@ -2,7 +2,9 @@
 
 **Video:** `artifacts/walkthrough.mp4` (also `.webm`) — a real, unedited session recorded with
 Playwright against the local compose stack (`make -C app up`), including a live agent round-trip.
-Stills referenced below are in `artifacts/`.
+**Narration is burned into the video** as a caption bar (subtitle-length versions of the scenes
+below), and `artifacts/walkthrough.srt` carries the same narration with measured timestamps for
+players that prefer toggleable subtitles. Stills referenced below are in `artifacts/`.
 
 **The one-liner:** load a property's floor plan as an interactive *shape object*, select the rooms
 and wall chunks you want changed, comment, and send — an AI agent edits the geometry through
