@@ -1,4 +1,5 @@
 import type { PlanGeometry, Room, Wall } from './types';
+// (wall helpers are defined below; clear-size functions at the bottom use them)
 
 export const PX_PER_M = 60;
 export const MARGIN_M = 0.8;
@@ -96,13 +97,46 @@ export function diffRooms(original: PlanGeometry, proposed: PlanGeometry): RoomD
   return { removed, added, modified };
 }
 
-// Dims are always shown on every room (style-guide invariant): '-' used to mean
-// "suppress" in the v1 source format, but we now auto-derive instead of hiding.
-export function autoDims(room: Room): string {
-  if (!room.dims || room.dims === '-') return `${room.w.toFixed(1)} x ${room.h.toFixed(1)}m`;
-  return room.dims;
-}
-
 export function snapM(v: number, step = 0.05): number {
   return Math.round(v / step) * step;
+}
+
+// ---- clear dimensions (the ONE dimension standard — walls subtracted) ----
+// Mirrors plan_core.dims exactly: rect span minus each side's wall encroachment
+// (wall inner face past the room edge). Authored dims strings are retired.
+const CLEAR_COORD_TOL = 0.4;
+const CLEAR_MIN_OVERLAP = 0.3;
+
+function encroachment(room: Room, walls: Wall[], edge: 'left' | 'right' | 'top' | 'bottom'): number {
+  const vertical = edge === 'left' || edge === 'right';
+  const coord =
+    edge === 'left' ? room.x : edge === 'right' ? room.x + room.w : edge === 'top' ? room.y : room.y + room.h;
+  const span: [number, number] = vertical ? [room.y, room.y + room.h] : [room.x, room.x + room.w];
+  let enc = 0;
+  for (const w of walls) {
+    if (wallIsVertical(w) !== vertical) continue;
+    if (w.a !== room.id && w.b !== room.id) continue;
+    const c = wallCoord(w);
+    if (Math.abs(c - coord) > CLEAR_COORD_TOL) continue;
+    const [lo, hi] = wallSpan(w);
+    if (Math.min(hi, span[1]) - Math.max(lo, span[0]) < CLEAR_MIN_OVERLAP) continue;
+    const half = w.b === 'exterior' ? EXTERIOR_HALF : INTERIOR_HALF;
+    const inner = edge === 'left' || edge === 'top' ? c + half : c - half;
+    const e = edge === 'left' || edge === 'top' ? inner - coord : coord - inner;
+    if (e > enc) enc = e;
+  }
+  return enc;
+}
+
+export function clearSize(room: Room, walls: Wall[]): { w: number; h: number } {
+  const w =
+    room.w - encroachment(room, walls, 'left') - encroachment(room, walls, 'right');
+  const h =
+    room.h - encroachment(room, walls, 'top') - encroachment(room, walls, 'bottom');
+  return { w: Math.max(w, 0), h: Math.max(h, 0) };
+}
+
+export function clearDims(room: Room, walls: Wall[]): string {
+  const { w, h } = clearSize(room, walls);
+  return `${w.toFixed(2)} x ${h.toFixed(2)}m`;
 }

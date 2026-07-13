@@ -47,6 +47,10 @@ export const api = {
     json<{ n: number; saved: boolean }>(`/api/reviews/${id}/versions/${n}/bookmark`, {
       method: 'POST',
     }),
+  createSandbox: () =>
+    json<{ review_id: string; plan_id: string }>('/api/admin/sandbox', { method: 'POST' }),
+  deleteSandbox: (reviewId: string) =>
+    json<{ deleted: boolean }>(`/api/admin/sandbox/${reviewId}`, { method: 'DELETE' }),
   refreshComps: (id: string) =>
     json<{ comps: Comp[] }>(`/api/reviews/${id}/comps/refresh`, { method: 'POST' }),
   planImageUrl: (planId: string) => `/api/plans/${planId}/image`,

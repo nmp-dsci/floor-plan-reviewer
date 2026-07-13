@@ -11,6 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from plan_core.dims import clear_describe
 from plan_core.schema import Change, PlanGeometry, Wall
 
 
@@ -39,15 +40,23 @@ def diff_geometries(a: PlanGeometry, b: PlanGeometry) -> list[DiffLine]:
     ra = {r.id: r for r in a.rooms}
     rb = {r.id: r for r in b.rooms}
     for rid in sorted(ra.keys() - rb.keys()):
-        lines.append(DiffLine(op="remove", obj="room", id=rid, before=ra[rid].describe()))
+        lines.append(
+            DiffLine(op="remove", obj="room", id=rid, before=clear_describe(ra[rid], a.walls))
+        )
     for rid in sorted(rb.keys() - ra.keys()):
-        lines.append(DiffLine(op="add", obj="room", id=rid, after=rb[rid].describe()))
+        lines.append(DiffLine(op="add", obj="room", id=rid, after=clear_describe(rb[rid], b.walls)))
     for rid in sorted(ra.keys() & rb.keys()):
         x, y = ra[rid], rb[rid]
         geom_changed = abs(x.x - y.x) + abs(x.y - y.y) + abs(x.w - y.w) + abs(x.h - y.h) > 0.05
         if geom_changed or x.name != y.name or x.kind != y.kind or x.fill != y.fill:
             lines.append(
-                DiffLine(op="modify", obj="room", id=rid, before=x.describe(), after=y.describe())
+                DiffLine(
+                    op="modify",
+                    obj="room",
+                    id=rid,
+                    before=clear_describe(x, a.walls),
+                    after=clear_describe(y, b.walls),
+                )
             )
 
     def openings_map(g: PlanGeometry) -> dict[str, str]:

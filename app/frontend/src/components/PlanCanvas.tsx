@@ -2,12 +2,13 @@ import { drag } from 'd3-drag';
 import { pointer, select } from 'd3-selection';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Op } from '../editing';
+import { isPendingId } from '../editing';
 import {
   EXTERIOR_HALF,
   INTERIOR_HALF,
   PX_PER_M,
   absToT,
-  autoDims,
+  clearDims,
   diffRooms,
   px,
   snapM,
@@ -46,6 +47,8 @@ interface Props {
   tool?: Tool;
   onTool?: (t: Tool) => void;
   onOps?: (ops: Op[]) => void;
+  onRewrite?: (pvId: string, patch: Record<string, number | string>) => void;
+  onWallMove?: (wallId: string, d: number) => void;
   onRegion?: (r: { x: number; y: number; w: number; h: number }) => void;
   pendingIds?: Set<string>;
 }
@@ -75,6 +78,8 @@ export default function PlanCanvas({
   tool = 'select',
   onTool,
   onOps,
+  onRewrite,
+  onWallMove,
   onRegion,
   pendingIds,
 }: Props) {
@@ -82,6 +87,7 @@ export default function PlanCanvas({
   const [multi, setMulti] = useState(false);
   const [dragState, setDragState] = useState<DragState>(null);
   const [draw, setDraw] = useState<DrawState | null>(null);
+  const [wallDragD, setWallDragD] = useState(0);
   const pressTimer = useRef<number | null>(null);
   const vp = viewport(geometry);
   const nestedIds = new Set(geometry.rooms.filter((r) => r.z !== 0).map((r) => r.id));
@@ -106,7 +112,7 @@ export default function PlanCanvas({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onSelectionChange({ rooms: [], walls: [], fixtures: [], openings: [] });
+        onSelectionChange({ rooms: [], walls: [], fixtures: [], openings: [], region: null });
         setMulti(false);
         setDraw(null);
       }
@@ -122,6 +128,7 @@ export default function PlanCanvas({
       if (additive || multi) {
         onSelectionChange({
           ...selection,
+          region: null,
           rooms: has ? selection.rooms.filter((r) => r !== id) : [...selection.rooms, id],
         });
       } else {
@@ -130,6 +137,7 @@ export default function PlanCanvas({
           walls: [],
           fixtures: [],
           openings: [],
+          region: null,
         });
       }
     },
@@ -143,6 +151,7 @@ export default function PlanCanvas({
       if (additive || multi) {
         onSelectionChange({
           ...selection,
+          region: null,
           fixtures: has ? selection.fixtures.filter((f) => f !== id) : [...selection.fixtures, id],
         });
       } else {
@@ -151,6 +160,7 @@ export default function PlanCanvas({
           walls: [],
           fixtures: has && selection.fixtures.length === 1 ? [] : [id],
           openings: [],
+          region: null,
         });
       }
     },
@@ -158,8 +168,7 @@ export default function PlanCanvas({
   );
 
   // Select a wall chunk. When a wall carries openings, clicking picks the SOLID
-  // segment (the "side") flanking the click point, so each side is editable on its
-  // own; a wall with no openings selects whole.
+  // segment (the "side") flanking the click point; a wall with no openings selects whole.
   const selectWallChunk = useCallback(
     (wall: Wall, t0: number, t1: number, additive: boolean) => {
       if (!interactive) return;
@@ -169,6 +178,7 @@ export default function PlanCanvas({
       if (additive || multi) {
         onSelectionChange({
           ...selection,
+          region: null,
           walls: has
             ? selection.walls.filter((w) => w.id !== wall.id)
             : [...selection.walls, entry],
@@ -179,6 +189,7 @@ export default function PlanCanvas({
           walls: has && selection.walls.length === 1 && selection.walls[0].whole === whole ? [] : [entry],
           fixtures: [],
           openings: [],
+          region: null,
         });
       }
     },
@@ -194,6 +205,7 @@ export default function PlanCanvas({
         walls: [],
         fixtures: [],
         openings: has ? [] : [{ id: openingId, wallId }],
+        region: null,
       });
     },
     [interactive, onSelectionChange, selection.openings],
@@ -215,8 +227,35 @@ export default function PlanCanvas({
     [onOps, onTool, toMetres],
   );
 
-  // long-press anywhere on the canvas → sticky multi-select mode
-  const drawing = (tool === 'add-fixture' || tool === 'add-room') && editable;
+  const placeWall = useCallback(
+    (d: DrawState) => {
+      if (!onOps) return;
+      const horizontalDrag = Math.abs(d.x1 - d.x0) >= Math.abs(d.y1 - d.y0);
+      // dragging along X draws a horizontal wall → axis 'y' cut; along Y → vertical wall
+      const axis: 'x' | 'y' = horizontalDrag ? 'y' : 'x';
+      const at = snapM(axis === 'y' ? (d.y0 + d.y1) / 2 : (d.x0 + d.x1) / 2);
+      const midX = (d.x0 + d.x1) / 2;
+      const midY = (d.y0 + d.y1) / 2;
+      const host = geometry.rooms.find(
+        (r) =>
+          r.z === 0 &&
+          !isPendingId(r.id) &&
+          midX > r.x &&
+          midX < r.x + r.w &&
+          midY > r.y &&
+          midY < r.y + r.h,
+      );
+      onTool?.('select');
+      if (!host) return;
+      const lo = axis === 'y' ? host.y : host.x;
+      const hi = axis === 'y' ? host.y + host.h : host.x + host.w;
+      if (!(lo + 0.5 < at && at < hi - 0.5)) return; // too close to the edge to split
+      onOps([{ op: 'split_room', room_id: host.id, axis, at, new_name: 'NEW ROOM' }]);
+    },
+    [geometry.rooms, onOps, onTool],
+  );
+
+  const drawing = (tool === 'add-fixture' || tool === 'add-room' || tool === 'add-wall') && editable;
   const onPointerDownBg = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!interactive) return;
     if (drawing) {
@@ -237,15 +276,22 @@ export default function PlanCanvas({
   const onPointerUpBg = (e: React.PointerEvent<SVGSVGElement>) => {
     cancelPress();
     if (draw) {
+      const wasTool = tool;
       const x = snapM(Math.min(draw.x0, draw.x1));
       const y = snapM(Math.min(draw.y0, draw.y1));
       const w = snapM(Math.abs(draw.x1 - draw.x0));
       const h = snapM(Math.abs(draw.y1 - draw.y0));
-      const wasRoom = tool === 'add-room';
+      const d = draw;
       setDraw(null);
+      if (wasTool === 'add-wall') {
+        if (Math.max(Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0)) >= 0.4) placeWall(d);
+        else onTool?.('select');
+        e.stopPropagation();
+        return;
+      }
       onTool?.('select');
       if (w >= 0.2 && h >= 0.2) {
-        if (wasRoom) onRegion?.({ x, y, w, h });
+        if (wasTool === 'add-room') onRegion?.({ x, y, w, h });
         else onOps?.([{ op: 'add_fixture', x, y, w, h, label: '' }]);
       }
       e.stopPropagation();
@@ -260,7 +306,7 @@ export default function PlanCanvas({
 
   const backgroundClick = () => {
     if (!interactive || draw) return;
-    onSelectionChange({ rooms: [], walls: [], fixtures: [], openings: [] });
+    onSelectionChange({ rooms: [], walls: [], fixtures: [], openings: [], region: null });
     setMulti(false);
   };
 
@@ -281,44 +327,32 @@ export default function PlanCanvas({
   };
 
   const commitMoveResize = (obj: 'room' | 'fixture', id: string) => {
-    if (!onOps || !dragState || dragState.id !== id) {
+    if (!dragState || dragState.id !== id) {
       setDragState(null);
-      return;
+      return false;
     }
     const moved =
       dragState.kind === 'move'
         ? Math.abs(dragState.dx) + Math.abs(dragState.dy) > 1e-9
         : Math.abs(dragState.dw) + Math.abs(dragState.dh) > 1e-9;
     if (moved) {
-      if (obj === 'room') {
-        const r = roomsById.get(id);
-        if (r) {
-          const nr = liveRect('room', id, r);
-          onOps([
-            {
-              op: 'resize_room',
-              room_id: id,
-              x: snapM(nr.x),
-              y: snapM(nr.y),
-              w: Math.max(0.7, snapM(nr.w)),
-              h: Math.max(0.7, snapM(nr.h)),
-            },
-          ]);
-        }
-      } else {
-        const f = fixturesById.get(id);
-        if (f) {
-          const nf = liveRect('fixture', id, f);
-          onOps([
-            {
-              op: 'modify_fixture',
-              fixture_id: id,
-              x: snapM(nf.x),
-              y: snapM(nf.y),
-              w: Math.max(0.2, snapM(nf.w)),
-              h: Math.max(0.2, snapM(nf.h)),
-            },
-          ]);
+      const src = obj === 'room' ? roomsById.get(id) : fixturesById.get(id);
+      if (src) {
+        const nr = liveRect(obj, id, src);
+        const minSide = obj === 'room' ? 0.7 : 0.2;
+        const rect = {
+          x: snapM(nr.x),
+          y: snapM(nr.y),
+          w: Math.max(minSide, snapM(nr.w)),
+          h: Math.max(minSide, snapM(nr.h)),
+        };
+        if (isPendingId(id)) {
+          // pending object: rewrite its originating add op in place
+          onRewrite?.(id, rect);
+        } else if (obj === 'room') {
+          onOps?.([{ op: 'resize_room', room_id: id, ...rect }]);
+        } else {
+          onOps?.([{ op: 'modify_fixture', fixture_id: id, ...rect }]);
         }
       }
     }
@@ -344,7 +378,7 @@ export default function PlanCanvas({
           .filter((r) => r.z === 0)
           .map((r) => {
             const lr = liveRect('room', r.id, r);
-            const isNew = r.id.startsWith('pv-room');
+            const isNew = isPendingId(r.id);
             return (
               <rect
                 key={`fill-${r.id}`}
@@ -404,9 +438,15 @@ export default function PlanCanvas({
             </g>
           );
         })}
-        {/* labels */}
+        {/* labels — clear dimensions, always visible */}
         {geometry.rooms.map((r) => (
-          <RoomLabel key={`lb-${r.id}`} room={{ ...r, ...liveRect('room', r.id, r) }} X={X} Y={Y} />
+          <RoomLabel
+            key={`lb-${r.id}`}
+            room={{ ...r, ...liveRect('room', r.id, r) }}
+            dims={clearDims({ ...r, ...liveRect('room', r.id, r) }, geometry.walls)}
+            X={X}
+            Y={Y}
+          />
         ))}
 
         {/* delta overlays */}
@@ -424,8 +464,6 @@ export default function PlanCanvas({
                   strokeWidth={2.5}
                   strokeDasharray="8 5"
                 />
-                {/* removed labels sit at the BOTTOM so they never collide with an added
-                    room's label at the same top-left corner; white halo keeps them legible */}
                 <text
                   x={X(r.x) + 6}
                   y={Y(r.y + r.h) - 5}
@@ -508,11 +546,10 @@ export default function PlanCanvas({
         {pendingIds && (
           <g pointerEvents="none">
             {geometry.rooms
-              .filter((r) => pendingIds.has(r.id) || r.id.startsWith('pv-room'))
+              .filter((r) => pendingIds.has(r.id) || isPendingId(r.id))
               .map((r) => {
                 const lr = liveRect('room', r.id, r);
-                const isNew = r.id.startsWith('pv-room');
-                // new rooms get a solid green boundary (walls derive on apply); edits stay amber
+                const isNew = isPendingId(r.id);
                 return (
                   <rect
                     key={`pend-${r.id}`}
@@ -528,7 +565,7 @@ export default function PlanCanvas({
                 );
               })}
             {geometry.fixtures
-              .filter((f) => pendingIds.has(f.id) || f.id.startsWith('pv-'))
+              .filter((f) => pendingIds.has(f.id) || isPendingId(f.id))
               .map((f) => {
                 const lf = liveRect('fixture', f.id, f);
                 return (
@@ -548,12 +585,10 @@ export default function PlanCanvas({
           </g>
         )}
 
-        {/* interaction layer — preview (pv-) objects are uncommitted, not selectable */}
+        {/* interaction layer — pending (pv-) objects are selectable and editable */}
         {interactive && (
           <g>
-            {geometry.rooms
-              .filter((r) => !r.id.startsWith('pv-'))
-              .map((r) => (
+            {geometry.rooms.map((r) => (
               <rect
                 key={`hit-${r.id}`}
                 className="room-hit"
@@ -604,11 +639,9 @@ export default function PlanCanvas({
                 </line>
               );
             })}
-            {/* opening hit rects — preview openings (pv-) are uncommitted */}
+            {/* opening hit rects (incl. pending previews) */}
             {geometry.walls.map((w) =>
-              w.openings
-                .filter((o) => !o.id.startsWith('pv-'))
-                .map((o) => {
+              w.openings.map((o) => {
                 const half = wallHalf(w) + 4;
                 const a0 = tToAbs(w, o.t0);
                 const a1 = tToAbs(w, o.t1);
@@ -635,10 +668,8 @@ export default function PlanCanvas({
                 );
               }),
             )}
-            {/* fixture hit rects (above room hits) */}
-            {geometry.fixtures
-              .filter((f) => !f.id.startsWith('pv-'))
-              .map((f) => (
+            {/* fixture hit rects (above room hits; incl. pending previews) */}
+            {geometry.fixtures.map((f) => (
               <rect
                 key={`fhit-${f.id}`}
                 className="fixture-hit"
@@ -708,25 +739,42 @@ export default function PlanCanvas({
             />
           );
         })}
-        {/* selection overlays: wall chunks */}
+        {/* selection overlays: wall spans + perpendicular wall-move drag */}
         {selection.walls.map((ws) => {
           const w = wallsById.get(ws.id);
           if (!w) return null;
           return (
-            <ChunkOverlay
-              key={`selw-${ws.id}`}
-              wall={w}
-              sel={ws}
-              X={X}
-              Y={Y}
-              svgRef={svgRef}
-              onChange={(t0, t1, whole) =>
-                onSelectionChange({
-                  ...selection,
-                  walls: selection.walls.map((x) => (x.id === ws.id ? { ...x, t0, t1, whole } : x)),
-                })
-              }
-            />
+            <g key={`selw-${ws.id}`}>
+              <ChunkOverlay
+                wall={w}
+                sel={ws}
+                X={X}
+                Y={Y}
+                svgRef={svgRef}
+                shift={wallDragD}
+                onChange={(t0, t1, whole) =>
+                  onSelectionChange({
+                    ...selection,
+                    walls: selection.walls.map((x) => (x.id === ws.id ? { ...x, t0, t1, whole } : x)),
+                  })
+                }
+              />
+              {editable && onWallMove && (
+                <WallMoveHandle
+                  wall={w}
+                  sel={ws}
+                  X={X}
+                  Y={Y}
+                  toMetres={toMetres}
+                  d={wallDragD}
+                  onDrag={setWallDragD}
+                  onCommit={(d) => {
+                    setWallDragD(0);
+                    if (Math.abs(d) > 1e-9) onWallMove(w.id, d);
+                  }}
+                />
+              )}
+            </g>
           );
         })}
         {/* selection overlays: openings */}
@@ -745,9 +793,10 @@ export default function PlanCanvas({
               Y={Y}
               editable={editable}
               toMetres={toMetres}
-              onCommit={(t0, t1) =>
-                onOps?.([{ op: 'modify_opening', opening_id: o.id, t0, t1 }])
-              }
+              onCommit={(t0, t1) => {
+                if (isPendingId(o.id)) onRewrite?.(o.id, { t0, t1 });
+                else onOps?.([{ op: 'modify_opening', opening_id: o.id, t0, t1 }]);
+              }}
             />
           );
         })}
@@ -781,8 +830,8 @@ export default function PlanCanvas({
           </g>
         )}
 
-        {/* add-fixture / add-room draw preview */}
-        {draw && (
+        {/* draw previews */}
+        {draw && tool !== 'add-wall' && (
           <rect
             x={X(Math.min(draw.x0, draw.x1))}
             y={Y(Math.min(draw.y0, draw.y1))}
@@ -792,6 +841,18 @@ export default function PlanCanvas({
             stroke={AMBER}
             strokeWidth={2}
             strokeDasharray="5 4"
+            pointerEvents="none"
+          />
+        )}
+        {draw && tool === 'add-wall' && (
+          <line
+            x1={X(Math.abs(draw.x1 - draw.x0) >= Math.abs(draw.y1 - draw.y0) ? draw.x0 : (draw.x0 + draw.x1) / 2)}
+            y1={Y(Math.abs(draw.x1 - draw.x0) >= Math.abs(draw.y1 - draw.y0) ? (draw.y0 + draw.y1) / 2 : draw.y0)}
+            x2={X(Math.abs(draw.x1 - draw.x0) >= Math.abs(draw.y1 - draw.y0) ? draw.x1 : (draw.x0 + draw.x1) / 2)}
+            y2={Y(Math.abs(draw.x1 - draw.x0) >= Math.abs(draw.y1 - draw.y0) ? (draw.y0 + draw.y1) / 2 : draw.y1)}
+            stroke={AMBER}
+            strokeWidth={6}
+            strokeDasharray="8 5"
             pointerEvents="none"
           />
         )}
@@ -814,6 +875,11 @@ export default function PlanCanvas({
         {tool === 'add-room' && (
           <text x={10} y={20} fontSize={12} fontWeight={700} fill={AMBER} letterSpacing={2}>
             ADD ROOM — drag out the space
+          </text>
+        )}
+        {tool === 'add-wall' && (
+          <text x={10} y={20} fontSize={12} fontWeight={700} fill={AMBER} letterSpacing={2}>
+            ADD WALL — drag a line across a room
           </text>
         )}
       </svg>
@@ -923,8 +989,7 @@ function SelectableRect({
   );
 }
 
-/** The solid wall segment (t0,t1) containing t, bounded by adjacent openings.
- * A wall with no openings yields the whole span [0,1]. */
+/** The solid wall segment (t0,t1) containing t, bounded by adjacent openings. */
 function solidSegmentAt(wall: Wall, t: number): [number, number] {
   const edges = wall.openings
     .map((o): [number, number] => [Math.min(o.t0, o.t1), Math.max(o.t0, o.t1)])
@@ -990,13 +1055,22 @@ function OpeningGap({
   );
 }
 
-function RoomLabel({ room, X, Y }: { room: Room; X: (m: number) => number; Y: (m: number) => number }) {
+function RoomLabel({
+  room,
+  dims,
+  X,
+  Y,
+}: {
+  room: Room;
+  dims: string;
+  X: (m: number) => number;
+  Y: (m: number) => number;
+}) {
   const wPx = px(room.w);
   const hPx = px(room.h);
   const name = room.name.toUpperCase();
   const size = Math.max(6.5, Math.min(13, Math.min(wPx / (name.length * 0.68), hPx / 3)));
-  const dims = autoDims(room);
-  // dims are ALWAYS shown (style-guide invariant) — shrink instead of hiding
+  // clear dims are ALWAYS shown — shrink instead of hiding
   const dimSize = Math.max(6, Math.min(size * 0.82, wPx / (dims.length * 0.6)));
   const cx = X(room.x) + wPx / 2;
   const cy = Y(room.y) + hPx / 2;
@@ -1041,7 +1115,7 @@ function FixtureLabel({
   );
 }
 
-/** Selected opening: red bar + draggable end handles (modify_opening on release). */
+/** Selected opening: red bar + draggable end handles. */
 function OpeningOverlay({
   wall,
   openingId,
@@ -1120,12 +1194,106 @@ function OpeningOverlay({
   );
 }
 
+/** Perpendicular wall-move: an invisible fat grab-line over the selected wall.
+ * Dragging it shows the wall shifted by d and both live dims; release commits. */
+function WallMoveHandle({
+  wall,
+  sel,
+  X,
+  Y,
+  toMetres,
+  d,
+  onDrag,
+  onCommit,
+}: {
+  wall: Wall;
+  sel: WallSelection;
+  X: (m: number) => number;
+  Y: (m: number) => number;
+  toMetres: (cx: number, cy: number) => { mx: number; my: number };
+  d: number;
+  onDrag: (d: number) => void;
+  onCommit: (d: number) => void;
+}) {
+  const start = useRef<number | null>(null);
+  const vert = wallIsVertical(wall);
+  const c = wallCoord(wall);
+  const a0 = tToAbs(wall, sel.t0);
+  const a1 = tToAbs(wall, sel.t1);
+  const exterior = wall.b === 'exterior';
+
+  const onDown = (e: React.PointerEvent) => {
+    if (exterior) return;
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    const { mx, my } = toMetres(e.clientX, e.clientY);
+    start.current = vert ? mx : my;
+  };
+  const onMove = (e: React.PointerEvent) => {
+    if (start.current === null) return;
+    e.stopPropagation();
+    const { mx, my } = toMetres(e.clientX, e.clientY);
+    onDrag(snapM((vert ? mx : my) - start.current));
+  };
+  const onUp = (e: React.PointerEvent) => {
+    if (start.current === null) return;
+    e.stopPropagation();
+    start.current = null;
+    onCommit(d);
+  };
+
+  const cs = c + d;
+  const line = vert
+    ? { x1: X(cs), y1: Y(a0), x2: X(cs), y2: Y(a1) }
+    : { x1: X(a0), y1: Y(cs), x2: X(a1), y2: Y(cs) };
+  return (
+    <g>
+      {Math.abs(d) > 1e-9 && (
+        <>
+          <line {...line} stroke={AMBER} strokeWidth={7} strokeDasharray="8 5" pointerEvents="none" opacity={0.9} />
+          <text
+            x={(line.x1 + line.x2) / 2 + (vert ? 16 : 0)}
+            y={(line.y1 + line.y2) / 2 + (vert ? -8 : -14)}
+            fontSize={11}
+            fontWeight={700}
+            textAnchor="middle"
+            fill={AMBER}
+            stroke="#fff"
+            strokeWidth={3}
+            paintOrder="stroke"
+            pointerEvents="none"
+          >
+            {d > 0 ? '+' : ''}{d.toFixed(2)}m
+          </text>
+        </>
+      )}
+      <line
+        x1={vert ? X(c) : X(a0)}
+        y1={vert ? Y(a0) : Y(c)}
+        x2={vert ? X(c) : X(a1)}
+        y2={vert ? Y(a1) : Y(c)}
+        stroke="transparent"
+        strokeWidth={18}
+        style={{ cursor: exterior ? 'not-allowed' : vert ? 'ew-resize' : 'ns-resize' }}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <title>{exterior ? 'exterior wall — envelope is immutable' : 'drag to move this wall'}</title>
+      </line>
+    </g>
+  );
+}
+
+/** Span picker: selection-only handles along the wall (restyled hollow + "span"). */
 function ChunkOverlay({
   wall,
   sel,
   X,
   Y,
   svgRef,
+  shift,
   onChange,
 }: {
   wall: Wall;
@@ -1133,6 +1301,7 @@ function ChunkOverlay({
   X: (m: number) => number;
   Y: (m: number) => number;
   svgRef: React.RefObject<SVGSVGElement | null>;
+  shift: number;
   onChange: (t0: number, t1: number, whole: boolean) => void;
 }) {
   const vert = wallIsVertical(wall);
@@ -1149,7 +1318,6 @@ function ChunkOverlay({
       if (!el) return;
       const behavior = drag<SVGCircleElement, unknown>().on('drag', (event) => {
         const [mx, my] = pointer(event.sourceEvent as PointerEvent, svg);
-        // convert px back to metres along the wall axis
         const metre = vert ? (my - Y(0)) / PX_PER_M : (mx - X(0)) / PX_PER_M;
         const t = snapT(absToT(wall, metre));
         if (which === 0) onChange(Math.min(t, sel.t1 - SNAP), sel.t1, false);
@@ -1161,14 +1329,15 @@ function ChunkOverlay({
     attach(h1.current, 1);
   });
 
+  if (Math.abs(shift) > 1e-9) return null; // hide the span picker while the wall itself is being moved
   const line = vert
     ? { x1: X(c), y1: Y(a0), x2: X(c), y2: Y(a1) }
     : { x1: X(a0), y1: Y(c), x2: X(a1), y2: Y(c) };
   return (
     <g>
       <line {...line} stroke={RED} strokeWidth={9} strokeLinecap="round" opacity={0.85} pointerEvents="none" />
-      <circle ref={h0} cx={line.x1} cy={line.y1} r={7} fill="#fff" stroke={RED} strokeWidth={3} style={{ cursor: vert ? 'ns-resize' : 'ew-resize' }} />
-      <circle ref={h1} cx={line.x2} cy={line.y2} r={7} fill="#fff" stroke={RED} strokeWidth={3} style={{ cursor: vert ? 'ns-resize' : 'ew-resize' }} />
+      <circle ref={h0} cx={line.x1} cy={line.y1} r={7} fill="#fff" stroke={RED} strokeWidth={2} strokeDasharray="2.5 2" style={{ cursor: vert ? 'ns-resize' : 'ew-resize' }} />
+      <circle ref={h1} cx={line.x2} cy={line.y2} r={7} fill="#fff" stroke={RED} strokeWidth={2} strokeDasharray="2.5 2" style={{ cursor: vert ? 'ns-resize' : 'ew-resize' }} />
       {!sel.whole && (
         <text
           x={(line.x1 + line.x2) / 2}
@@ -1177,9 +1346,12 @@ function ChunkOverlay({
           fontWeight={700}
           textAnchor="middle"
           fill={RED}
+          stroke="#fff"
+          strokeWidth={3}
+          paintOrder="stroke"
           pointerEvents="none"
         >
-          {((sel.t1 - sel.t0) * (tToAbs(wall, 1) - tToAbs(wall, 0))).toFixed(1)}m chunk
+          {((sel.t1 - sel.t0) * (tToAbs(wall, 1) - tToAbs(wall, 0))).toFixed(1)}m span
         </text>
       )}
     </g>

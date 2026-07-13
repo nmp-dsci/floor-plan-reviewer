@@ -228,9 +228,7 @@ def test_op_targeting_missing_object_is_skipped_not_crash(v03) -> None:
     # a resize op referencing an uncommitted preview id must warn, never raise
     result = apply_ops(
         v03,
-        parse_ops(
-            [{"op": "resize_room", "room_id": "pv-room1", "x": 0, "y": 0, "w": 3, "h": 3}]
-        ),
+        parse_ops([{"op": "resize_room", "room_id": "pv-room1", "x": 0, "y": 0, "w": 3, "h": 3}]),
     )
     assert any("pv-room1" in w and "not found" in w for w in result.warnings), result.warnings
     errors, _ = validate(result.geometry)
@@ -248,6 +246,27 @@ def test_footprint_change_is_rejected() -> None:
     # matching envelope → no footprint error
     ok = PlanGeometry(rooms=[room], meta={"envelope": [0.0, 0.0, 10.0, 8.0]})
     assert not any("footprint" in e for e in validate(ok)[0])
+
+
+def test_clear_dimensions(v03) -> None:
+    from plan_core import clear_dims_label, clear_internal_area, clear_size
+
+    # every room's clear size is positive and strictly smaller than its rect
+    for r in v03.rooms:
+        cw, ch = clear_size(r, v03.walls)
+        assert 0 < cw <= r.w + 1e-9 and 0 < ch <= r.h + 1e-9, (r.id, cw, ch)
+    # clear area < rect area, both positive
+    assert 0 < clear_internal_area(v03) < v03.internal_area()
+    # pinned example from the app-seed geometry: bed-3 3.00x3.00 rect → 2.85x2.92 clear
+    import json
+    from pathlib import Path
+
+    seed = Path(__file__).resolve().parents[3] / "seed" / "plan_v03.json"
+    geo = convert_v1(json.loads(seed.read_text()))
+    bed3 = geo.room("bed-3")
+    cw, ch = clear_size(bed3, geo.walls)
+    assert abs(cw - 2.85) < 0.02 and abs(ch - 2.92) < 0.02, (cw, ch)
+    assert clear_dims_label(bed3, geo.walls).endswith("m")
 
 
 def test_change_author_defaults_to_agent_and_lands_in_hunk(v03) -> None:

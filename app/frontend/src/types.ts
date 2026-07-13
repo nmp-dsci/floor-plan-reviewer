@@ -168,7 +168,7 @@ export const hasSelection = (s: Selection): boolean =>
   s.openings.length > 0 ||
   Boolean(s.region);
 
-export type Tool = 'select' | 'add-opening' | 'add-fixture' | 'add-room';
+export type Tool = 'select' | 'add-opening' | 'add-fixture' | 'add-room' | 'add-wall';
 
 export interface QueuedComment {
   id: string;

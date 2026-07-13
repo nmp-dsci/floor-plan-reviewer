@@ -5,8 +5,19 @@ import ContextBar from '../components/ContextBar';
 import Inspector from '../components/Inspector';
 import PlanCanvas from '../components/PlanCanvas';
 import Register from '../components/Register';
-import type { Op } from '../editing';
-import { applyOpsPreview, describeOps, touchedIds } from '../editing';
+import type { Op, PendingEntry } from '../editing';
+import {
+  applyOpsPreview,
+  describeOps,
+  isPendingId,
+  newPid,
+  placeCopy,
+  pvId,
+  removePendingObject,
+  rewritePendingObject,
+  touchedIds,
+  wallMoveOps,
+} from '../editing';
 import type {
   Fixture,
   OpeningType,
@@ -44,7 +55,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
   const [mode, setMode] = useState<'proposed' | 'delta'>('proposed');
   const [selection, setSelection] = useState<Selection>(emptySelection());
   const [tool, setTool] = useState<Tool>('select');
-  const [pending, setPending] = useState<Op[]>([]);
+  const [pending, setPending] = useState<PendingEntry[]>([]);
   const [queue, setQueue] = useState<QueuedComment[]>(() => {
     try {
       return JSON.parse(localStorage.getItem(queueKey(reviewId)) || '[]');
@@ -70,12 +81,11 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
       setReview(r);
       const target = jumpToHead || currentNRef.current === null ? r.head_n : currentNRef.current;
       if (target !== null) setCurrentN(target);
-      // all registers in one round-trip (no N+1)
       const regs = new Map<number, RegisterHunk[]>();
       try {
         for (const { n, register } of await api.registers(reviewId)) regs.set(n, register);
       } catch {
-        /* older backend — registers arrive per-version below */
+        /* older backend */
       }
       setRegisters(regs);
       const v0 = r.versions.find((v) => v.n === 0);
@@ -134,7 +144,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
     [reviewId, loadReview, onVersionAdded],
   );
 
-  // Keyboard: Delete removes selection; Cmd/Ctrl+C copies a room/fixture, +V pastes it.
+  // Keyboard: Delete removes selection; Cmd/Ctrl+C copies; +V pastes; +Z undoes.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -143,23 +153,6 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
       const mod = e.metaKey || e.ctrlKey;
       const key = e.key.toLowerCase();
 
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (!hasSelection(selection)) return;
-        e.preventDefault();
-        setPending((p) => [
-          ...p,
-          ...selection.rooms.map((id) => ({ op: 'remove_room', room_id: id }) as Op),
-          ...selection.fixtures.map((id) => ({ op: 'remove_fixture', fixture_id: id }) as Op),
-          ...selection.openings.map((o) => ({ op: 'remove_opening', opening_id: o.id }) as Op),
-          ...selection.walls.map(
-            (w) => ({ op: 'remove_wall_chunk', wall_id: w.id, t0: w.t0, t1: w.t1 }) as Op,
-          ),
-        ]);
-        setSelection(emptySelection());
-        return;
-      }
-
-      // Cmd/Ctrl+Z — undo the last pending op, else roll back the last applied version
       if (mod && key === 'z') {
         if (pending.length > 0) {
           e.preventDefault();
@@ -188,22 +181,49 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
         return;
       }
 
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (!hasSelection(selection)) return;
+        e.preventDefault();
+        // pending objects: drop their originating op; real objects: queue remove ops
+        let next = pending;
+        for (const id of selection.rooms.filter(isPendingId)) next = removePendingObject(next, id);
+        for (const id of selection.fixtures.filter(isPendingId)) next = removePendingObject(next, id);
+        for (const o of selection.openings.filter((o) => isPendingId(o.id)))
+          next = removePendingObject(next, o.id);
+        const removeOps: Op[] = [
+          ...selection.rooms.filter((id) => !isPendingId(id)).map((id) => ({ op: 'remove_room', room_id: id }) as Op),
+          ...selection.fixtures
+            .filter((id) => !isPendingId(id))
+            .map((id) => ({ op: 'remove_fixture', fixture_id: id }) as Op),
+          ...selection.openings
+            .filter((o) => !isPendingId(o.id))
+            .map((o) => ({ op: 'remove_opening', opening_id: o.id }) as Op),
+          ...selection.walls.map(
+            (w) => ({ op: 'remove_wall_chunk', wall_id: w.id, t0: w.t0, t1: w.t1 }) as Op,
+          ),
+        ];
+        setPending([...next, ...removeOps.map((op) => ({ pid: newPid(), op }))]);
+        setSelection(emptySelection());
+        return;
+      }
+
       if (mod && key === 'c') {
+        const geo = previewGeo;
         if (selection.rooms.length === 1) {
-          const r = detail.geometry.rooms.find((r) => r.id === selection.rooms[0]);
+          const r = geo.rooms.find((r) => r.id === selection.rooms[0]);
           if (r) {
             setClipboard({ kind: 'room', data: r });
             e.preventDefault();
           }
         } else if (selection.fixtures.length === 1) {
-          const f = detail.geometry.fixtures.find((f) => f.id === selection.fixtures[0]);
+          const f = geo.fixtures.find((f) => f.id === selection.fixtures[0]);
           if (f) {
             setClipboard({ kind: 'fixture', data: f });
             e.preventDefault();
           }
         } else if (selection.openings.length === 1) {
           const os = selection.openings[0];
-          const w = detail.geometry.walls.find((w) => w.id === os.wallId);
+          const w = geo.walls.find((w) => w.id === os.wallId);
           const o = w?.openings.find((o) => o.id === os.id);
           if (w && o) {
             setClipboard({ kind: 'opening', data: { wallId: w.id, type: o.type, t0: o.t0, t1: o.t1 } });
@@ -215,20 +235,20 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
 
       if (mod && key === 'v' && clipboard) {
         e.preventDefault();
+        const env = (detail.geometry.meta.envelope as [number, number, number, number]) ?? [0, 0, 99, 99];
         if (clipboard.kind === 'room') {
           const r = clipboard.data;
-          setPending((p) => [
-            ...p,
-            { op: 'add_room', name: `${r.name} copy`, kind: r.kind, x: r.x + r.w + 0.15, y: r.y, w: r.w, h: r.h, fill: r.fill },
+          const at = placeCopy(r, env);
+          queueOps([
+            { op: 'add_room', name: `${r.name} copy`, kind: r.kind, x: at.x, y: at.y, w: r.w, h: r.h, fill: r.fill },
           ]);
         } else if (clipboard.kind === 'fixture') {
           const f = clipboard.data;
-          setPending((p) => [
-            ...p,
-            { op: 'add_fixture', x: f.x + 0.3, y: f.y + 0.3, w: f.w, h: f.h, label: f.label ? `${f.label} copy` : '' },
+          const at = placeCopy(f, env, 0.1);
+          queueOps([
+            { op: 'add_fixture', x: at.x, y: at.y, w: f.w, h: f.h, label: f.label ? `${f.label} copy` : '' },
           ]);
         } else {
-          // paste a matching opening onto the same wall, shifted along it (before if it won't fit after)
           const { wallId, type, t0, t1 } = clipboard.data;
           const len = t1 - t0;
           const gap = 0.06;
@@ -239,15 +259,16 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
             n0 = n1 - len;
           }
           if (n0 >= 0 && n1 <= 1) {
-            setPending((p) => [...p, { op: 'add_opening', wall_id: wallId, t0: n0, t1: n1, type }]);
+            queueOps([{ op: 'add_opening', wall_id: wallId, t0: n0, t1: n1, type }]);
           } else {
-            setBanner({ kind: 'error', text: 'No room on this wall to paste the opening — widen the wall or pick another.' });
+            setBanner({ kind: 'error', text: 'No room on this wall to paste the opening — pick another wall.' });
           }
         }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection, currentN, review, detail, clipboard, pending, busy, reviewId, loadReview, onVersionAdded]);
 
   if (!review || currentN === null || !detail) {
@@ -261,25 +282,54 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
     .flatMap((v) => (registers.get(v.n) ?? []).map((hunk) => ({ version: v.n, hunk })))
     .reverse();
 
-  // preview geometry with any pending human ops applied
+  // preview geometry with pending human ops applied — pv objects live here
   const previewGeo = pending.length > 0 ? applyOpsPreview(detail.geometry, pending) : detail.geometry;
   const pendingMarks = touchedIds(pending);
 
-  const queueOps = (ops: Op[]) => {
-    setPending((p) => [...p, ...ops]);
-    setSelection(emptySelection());
+  function queueOps(ops: Op[]) {
+    const entries = ops.map((op) => ({ pid: newPid(), op }));
+    setPending((p) => [...p, ...entries]);
+    // auto-select the created object so the inspector opens focused on its name
+    const creator = entries.find(
+      (e) => e.op.op === 'add_room' || e.op.op === 'add_fixture' || e.op.op === 'split_room',
+    );
+    if (creator) {
+      const id = pvId(creator.pid);
+      if (creator.op.op === 'add_fixture') setSelection({ ...emptySelection(), fixtures: [id] });
+      else setSelection({ ...emptySelection(), rooms: [id] });
+    } else {
+      setSelection(emptySelection());
+    }
     setTool('select');
+  }
+
+  const rewritePending = (pvObjectId: string, patch: Record<string, number | string>) => {
+    setPending((p) => rewritePendingObject(p, pvObjectId, patch));
+  };
+
+  const onWallMove = (wallId: string, d: number) => {
+    const wall = previewGeo.walls.find((w) => w.id === wallId);
+    if (!wall) return;
+    const res = wallMoveOps(previewGeo, wall, d);
+    if ('error' in res) {
+      setBanner({ kind: 'error', text: `Wall can’t move: ${res.error}` });
+      return;
+    }
+    setPending((p) => [...p, ...res.ops.map((op) => ({ pid: newPid(), op }))]);
+    setSelection(emptySelection());
   };
 
   const applyEdits = () => {
     if (pending.length === 0) return;
+    const ops = pending.map((e) => e.op);
     setBusy(true);
     setBanner({ kind: 'busy', text: 'Applying your edits…' });
     api
-      .applyEdits(reviewId, head, pending, describeOps(pending))
+      .applyEdits(reviewId, head, ops, describeOps(ops))
       .then((res) => {
         setBusy(false);
         setPending([]);
+        setSelection(emptySelection());
         setBanner({
           kind: 'ok',
           text: `v${String(res.n).padStart(2, '0')} saved${res.warnings.length ? ` — ${res.warnings.length} warning(s)` : ''}.`,
@@ -361,7 +411,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
               <span>Plan canvas</span>
               <small>
                 {atHead
-                  ? 'click to select · drag to move · handles to resize · edits batch until you apply'
+                  ? 'click to select · drag to move · walls drag sideways · edits batch until you apply'
                   : 'read-only — jump to head to edit'}
               </small>
             </h2>
@@ -375,6 +425,8 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
               tool={tool}
               onTool={setTool}
               onOps={queueOps}
+              onRewrite={rewritePending}
+              onWallMove={onWallMove}
               onRegion={(region) => setSelection({ ...emptySelection(), region })}
               pendingIds={pendingMarks}
             />
@@ -395,7 +447,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
               <small>direct edits — no agent, instant</small>
             </h2>
             <Inspector
-              geometry={detail.geometry}
+              geometry={previewGeo}
               selection={selection}
               pending={pending}
               busy={busy}
@@ -403,6 +455,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
               tool={tool}
               onTool={setTool}
               onOps={queueOps}
+              onRewrite={rewritePending}
               onRemovePending={(i) => setPending((p) => p.filter((_, idx) => idx !== i))}
               onApply={applyEdits}
               onDiscard={() => {

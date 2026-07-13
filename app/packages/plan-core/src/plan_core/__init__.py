@@ -7,6 +7,7 @@ validation bounce-back, compliance flag rules, and Pillow PNG export.
 
 from plan_core.convert import convert_v1
 from plan_core.diff import DiffLine, diff_geometries, register_hunk
+from plan_core.dims import clear_describe, clear_dims_label, clear_internal_area, clear_size
 from plan_core.ops import Op, OpsResult, apply_ops, parse_ops
 from plan_core.schema import Change, Fixture, Opening, PlanGeometry, Room, Wall
 from plan_core.validate import validate
@@ -23,6 +24,10 @@ __all__ = [
     "Room",
     "Wall",
     "apply_ops",
+    "clear_describe",
+    "clear_dims_label",
+    "clear_internal_area",
+    "clear_size",
     "convert_v1",
     "derive_walls",
     "diff_geometries",
