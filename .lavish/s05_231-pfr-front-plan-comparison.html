@@ -1,0 +1,208 @@
+<!doctype html>
+<title>231 PFR — Front & Plan Comparison (A4 landscape)</title>
+<style>
+  :root {
+    --ink: #141416; --paper: #ffffff; --grey: #e1e1e3; --grey-2: #f4f4f5; --faint: #74747a;
+    --red: #e23d28; --green: #1a7f37; --amber: #9a6700;
+    --mono: 'SF Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; min-width: 0; margin: 0; }
+  body { background: #ececee; font-family: 'Helvetica Neue', Arial, sans-serif; color: var(--ink); }
+
+  /* ---- A4 landscape sheets ---- */
+  @page { size: A4 landscape; margin: 0; }
+  .sheet {
+    width: 297mm; height: 210mm; background: var(--paper); overflow: hidden;
+    padding: 9mm 11mm 7mm; display: flex; flex-direction: column;
+    page-break-after: always; break-after: page;
+  }
+  @media screen {
+    .shwrap { margin: 10mm auto; }
+    .sheet { margin: 0 auto; box-shadow: 0 2px 14px rgba(0,0,0,0.18); }
+    .screen-note { max-width: 297mm; margin: 8mm auto 0; font-size: 12px; color: var(--faint); text-align: center; }
+  }
+  /* screen preview: sheets scale inside .shwrap via the fit() script; print is exempt */
+  .shwrap { display: flex; justify-content: center; }
+  @media print { .shwrap { display: contents; } .sheet { transform: none !important; } }
+  @media print { .screen-note { display: none; } body { background: var(--paper); } }
+
+  /* ---- shared chrome ---- */
+  .head { border-bottom: 1.2mm solid var(--ink); padding-bottom: 2.5mm; margin-bottom: 4mm;
+    display: flex; align-items: baseline; gap: 6mm; }
+  .head .kicker { font-size: 8.5pt; letter-spacing: 0.2em; color: var(--faint); text-transform: uppercase; }
+  .head h1 { font-size: 17pt; letter-spacing: 0.05em; text-transform: uppercase; }
+  .head .pg { margin-left: auto; font-family: var(--mono); font-size: 8.5pt; color: var(--faint); }
+  .foot { border-top: 0.35mm solid var(--grey); margin-top: auto; padding-top: 1.6mm;
+    font-size: 6.8pt; color: var(--faint); display: flex; gap: 4mm; }
+  .foot .brand { letter-spacing: 0.16em; text-transform: uppercase; }
+  .foot .right { margin-left: auto; font-family: var(--mono); }
+
+  .cap {
+    position: absolute; top: 3mm; left: 3mm; font-size: 8pt; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase; padding: 0.8mm 2.6mm; z-index: 2;
+  }
+  .cap.now { background: var(--ink); color: var(--paper); }
+  .cap.new { background: var(--green); color: var(--paper); }
+
+  .imgbox { position: relative; border: 0.8mm solid var(--ink); background: var(--paper);
+    display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .imgbox img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+
+  .rail h2 { font-size: 9.5pt; letter-spacing: 0.16em; text-transform: uppercase;
+    border-bottom: 0.8mm solid var(--ink); padding-bottom: 1.6mm; margin-bottom: 2.6mm; }
+  .rail ol { list-style: none; counter-reset: chg; }
+  .rail li { counter-increment: chg; display: flex; gap: 2.8mm; margin-bottom: 2.8mm; font-size: 8.6pt; line-height: 1.42; }
+  .rail li::before {
+    content: counter(chg, decimal-leading-zero); flex: none; font-family: var(--mono);
+    font-size: 8pt; font-weight: 700; color: var(--paper); background: var(--red);
+    width: 6.2mm; height: 6.2mm; display: flex; align-items: center; justify-content: center; margin-top: 0.3mm;
+  }
+  .rail li b { display: block; font-size: 8.8pt; text-transform: uppercase; letter-spacing: 0.05em; }
+  .rail li .d { color: #3c3c40; }
+  .rail .mono, .mono { font-family: var(--mono); }
+  .statrow { display: flex; gap: 2.2mm; margin-bottom: 3.2mm; flex-wrap: wrap; }
+  .stat { border: 0.5mm solid var(--ink); padding: 1.2mm 2.6mm; font-size: 7pt;
+    text-transform: uppercase; letter-spacing: 0.08em; }
+  .stat b { display: block; font-size: 8.8pt; letter-spacing: 0; font-family: var(--mono); white-space: nowrap; }
+  .stat.up b { color: var(--green); }
+
+  /* page 1 grid */
+  .p1grid { flex: 1; display: grid; grid-template-columns: 1fr 88mm; gap: 6mm; min-height: 0; }
+  .p1imgs { display: grid; grid-template-rows: 1fr 1fr; gap: 4mm; min-height: 0; }
+
+  /* page 2 grid */
+  .p2grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr 80mm; gap: 5mm; min-height: 0; }
+  .legend { display: flex; gap: 4mm; align-items: center; font-size: 7.6pt; color: var(--faint); margin-top: 2mm; }
+  .sw { display: inline-block; width: 3.6mm; height: 2.6mm; margin-right: 1.2mm; vertical-align: -0.3mm; }
+</style>
+
+<!-- ================= PAGE 1 — STREET FRONTAGE ================= -->
+<div class="shwrap"><section class="sheet">
+  <div class="head">
+    <div>
+      <div class="kicker">231 Peats Ferry Road, Hornsby · street frontage</div>
+      <h1>Front of house — existing → proposed</h1>
+    </div>
+    <div class="pg">PAGE 1 / 2</div>
+  </div>
+
+  <div class="p1grid">
+    <div class="p1imgs">
+      <div class="imgbox">
+        <span class="cap now">Existing</span>
+        <img src="pfr/231-PFR-front-existing.png" alt="Existing street frontage — orange face brick, recessed garage" />
+      </div>
+      <div class="imgbox">
+        <span class="cap new">Proposed</span>
+        <img src="pfr/231-PFR-front-proposed.png" alt="Proposed street frontage — white render, carport, new entry" />
+      </div>
+    </div>
+
+    <div class="rail">
+      <h2>What changes at the front</h2>
+      <ol>
+        <li><span><b>Carport added</b>
+          <span class="d">New white flat-roof carport carried over the driveway on slim posts, ahead of the
+          retained single garage — covered parking without touching the building envelope.</span></span></li>
+        <li><span><b>Full render over face brick</b>
+          <span class="d">The 1960s orange brickwork is rendered and painted crisp white; hip roof retained and
+          recoated charcoal with matching white fascia and gutters.</span></span></li>
+        <li><span><b>Front door opens to living</b>
+          <span class="d">Entry rebuilt around a timber-look pivot door with a full-height glazed sidelight and
+          relocated so the door lands directly in the living zone — no dog-leg entry hall.</span></span></li>
+        <li><span><b>Window joinery renewed</b>
+          <span class="d">Timber frames replaced with slim white aluminium; same openings, cleaner sight lines.</span></span></li>
+        <li><span><b>Driveway &amp; landscaping</b>
+          <span class="d">Concrete strips replaced by large-format tiles with a banded inlay; tiled entry steps
+          and porch; pebbled garden beds against the render.</span></span></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span class="brand">Floor-Plan Studio · concept proposal</span>
+    <span>Imagery indicative only — not architectural advice. Envelope unchanged.</span>
+    <span class="right">231-PFR · 2026-07-13</span>
+  </div>
+</section></div>
+
+<!-- ================= PAGE 2 — FLOOR PLAN ================= -->
+<div class="shwrap"><section class="sheet">
+  <div class="head">
+    <div>
+      <div class="kicker">231 Peats Ferry Road, Hornsby · floor plan</div>
+      <h1>Plan comparison — original → proposed</h1>
+    </div>
+    <div class="pg">PAGE 2 / 2</div>
+  </div>
+
+  <div class="p2grid">
+    <div class="imgbox">
+      <span class="cap now">Original</span>
+      <img src="pfr/231-PFR-plan-original.png" alt="Original floor plan — 3 bed, 1 bath, garage" />
+    </div>
+    <div class="imgbox">
+      <span class="cap new">Proposed</span>
+      <img src="pfr/231-PFR-plan-proposed.png" alt="Proposed floor plan with change overlays" />
+    </div>
+
+    <div class="rail">
+      <div class="statrow">
+        <div class="stat">Existing<b>3bd · 1ba · 1wc</b></div>
+        <div class="stat up">Proposed<b>4bd · 3ba · 2wc</b></div>
+      </div>
+      <h2>Key plan changes</h2>
+      <ol>
+        <li><span><b>Garage → master suite</b>
+          <span class="d">The 10.5m garage strip becomes a master suite <span class="mono">2.90×4.49</span> with
+          walk-in robe <span class="mono">2.85×2.20</span>, ensuite <span class="mono">2.80×1.50</span> and
+          storage <span class="mono">2.85×2.09</span> (parking moves to the new carport).</span></span></li>
+        <li><span><b>Balcony enclosed → open-plan living</b>
+          <span class="d">The covered balcony joins the interior as LIVING <span class="mono">7.12×2.80</span>,
+          flowing into the kitchen with a new island bench; KITCHEN/DINING trims to KITCHEN
+          <span class="mono">4.36×2.60</span>.</span></span></li>
+        <li><span><b>Bed 1 becomes a second suite</b>
+          <span class="d">Private ensuite <span class="mono">2.40×1.75</span> + walk-in robe
+          <span class="mono">2.45×1.65</span> carved from the rear hall, linen and BIR.</span></span></li>
+        <li><span><b>Second WC</b>
+          <span class="d">Additional WC <span class="mono">1.30×0.90</span> beside the main bathroom for the
+          bed 2–3 wing.</span></span></li>
+        <li><span><b>New multipurpose room</b>
+          <span class="d">Flexible room <span class="mono">1.70×2.75</span> off the laundry — study nook,
+          mudroom or pantry overflow.</span></span></li>
+      </ol>
+      <div class="legend">
+        <span><span class="sw" style="background:#e6f4ea;border:0.4mm solid var(--green)"></span>added</span>
+        <span><span class="sw" style="background:#fdecea;border:0.4mm dashed var(--red)"></span>removed</span>
+        <span><span class="sw" style="border:0.4mm dotted var(--amber)"></span>modified</span>
+        <span>— overlays as drawn on the proposed plan</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span class="brand">Floor-Plan Studio · concept proposal</span>
+    <span>All dimensions in metres, approximate. External envelope unchanged; validator-checked geometry.</span>
+    <span class="right">231-PFR · 2026-07-13</span>
+  </div>
+</section></div>
+
+<div class="screen-note">Two A4-landscape sheets — print or “Save as PDF” reproduces them exactly. Annotate anything you want changed.</div>
+
+<script>
+  // Screen-only: scale the fixed A4 sheets to the viewport; print uses true size.
+  function fitSheets() {
+    var vw = document.documentElement.clientWidth - 16;
+    document.querySelectorAll('.shwrap').forEach(function (w) {
+      var s = w.querySelector('.sheet');
+      if (!s) return;
+      var k = Math.min(1, vw / s.offsetWidth);
+      s.style.transform = k < 1 ? 'scale(' + k + ')' : '';
+      s.style.transformOrigin = 'top center';
+      w.style.height = (s.offsetHeight * k) + 'px';
+    });
+  }
+  window.addEventListener('resize', fitSheets);
+  window.addEventListener('load', fitSheets);
+  fitSheets();
+</script>

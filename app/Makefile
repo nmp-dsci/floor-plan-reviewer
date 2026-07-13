@@ -1,4 +1,4 @@
-.PHONY: up down logs test smoke demo demo-whats-new demo-tour demo-videos reseed
+.PHONY: up down logs test smoke demo demo-whats-new demo-tour demo-videos reseed e2e
 
 up:
 	docker compose up --build -d
@@ -44,3 +44,8 @@ demo-tour: reseed
 
 demo-videos: demo-whats-new demo-tour
 	@echo "both videos in app/demo/artifacts: whats_new.mp4 · product_tour.mp4"
+
+# Browser-level half of the Feature Checks: real gestures on a throwaway sandbox
+# review (drag/move/resize, wall drag, draws, shortcuts). Writes a PASS/FAIL report.
+e2e:
+	cd demo && uv sync -q && uv run playwright install chromium && uv run python e2e_feature_matrix.py

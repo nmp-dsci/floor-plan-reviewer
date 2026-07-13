@@ -1,0 +1,62 @@
+[
+  {
+    "feature": "select room \u2192 rename field auto-focused",
+    "status": "PASS",
+    "seconds": 0.49
+  },
+  {
+    "feature": "rename room (type + Enter)",
+    "status": "PASS",
+    "seconds": 0.74
+  },
+  {
+    "feature": "drag room to move",
+    "status": "PASS",
+    "seconds": 1.23
+  },
+  {
+    "feature": "corner-handle resize",
+    "status": "PASS",
+    "seconds": 1.21
+  },
+  {
+    "feature": "drag wall sideways (rooms trade space)",
+    "status": "PASS",
+    "seconds": 1.31
+  },
+  {
+    "feature": "add wall (draw line \u2192 split)",
+    "status": "PASS",
+    "seconds": 0.9
+  },
+  {
+    "feature": "draw fixture \u2192 label immediately",
+    "status": "PASS",
+    "seconds": 1.27
+  },
+  {
+    "feature": "\u2318C/\u2318V duplicate \u2192 copy is movable pre-apply",
+    "status": "PASS",
+    "seconds": 1.84
+  },
+  {
+    "feature": "Delete key removes selected object",
+    "status": "PASS",
+    "seconds": 1.23
+  },
+  {
+    "feature": "Ctrl+Z pops pending edit",
+    "status": "PASS",
+    "seconds": 1.11
+  },
+  {
+    "feature": "Apply batch \u2192 v01, Ctrl+Z rolls back",
+    "status": "PASS",
+    "seconds": 2.3
+  },
+  {
+    "feature": "clear dims visible on room labels",
+    "status": "PASS",
+    "seconds": 0.0
+  }
+]

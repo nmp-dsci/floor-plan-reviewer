@@ -11,6 +11,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from plan_core.dims import clear_dims_label, clear_internal_area
 from plan_core.schema import PlanGeometry, Room, Wall
 
 BLACK = (20, 20, 22)
@@ -73,19 +74,20 @@ def _fit_label(
     return None
 
 
-def _draw_labels(draw: ImageDraw.ImageDraw, room: Room, ox: float, oy: float) -> None:
+def _draw_labels(
+    draw: ImageDraw.ImageDraw, room: Room, walls: list[Wall], ox: float, oy: float
+) -> None:
     name = room.name.strip()
     if not name:
         return
     name_lines: list[tuple[str, bool]] = [(part, True) for part in name.upper().split()]
     if len(name_lines) > 2:
         name_lines = [(name.upper(), True)]
-    dims = room.dims.strip() or f"{room.w:.1f} x {room.h:.1f}m"
+    # one dimension standard: clear size (wall faces), never the authored string
+    dims = clear_dims_label(room, walls)
     x, y = ox + room.x * PX_PER_M, oy + room.y * PX_PER_M
     w, h = room.w * PX_PER_M, room.h * PX_PER_M
-    fitted = None
-    if dims != "-":
-        fitted = _fit_label(draw, [(name.upper(), True), (dims, False)], int(w), int(h))
+    fitted = _fit_label(draw, [(name.upper(), True), (dims, False)], int(w), int(h))
     if fitted is None:
         fitted = _fit_label(draw, [(name.upper(), True)], int(w), int(h))
     if fitted is None:
@@ -185,7 +187,7 @@ def render_png(
         )
 
     for room in geo.rooms:
-        _draw_labels(draw, room, ox, oy)
+        _draw_labels(draw, room, geo.walls, ox, oy)
 
     ty = round((ey1 - ey0) * PX_PER_M) + 2 * margin + 20
     for i, line in enumerate(title_lines):
@@ -193,7 +195,7 @@ def render_png(
         text = str(line).upper()
         draw.text(((width - draw.textlength(text, font=font)) / 2, ty), text, font=font, fill=BLACK)
         ty += 38 if i < 2 else 26
-    area_line = f"APPROX. INTERNAL FLOOR AREA: {geo.internal_area():.0f} SQM"
+    area_line = f"APPROX. INTERNAL FLOOR AREA: {clear_internal_area(geo):.0f} SQM (CLEAR)"
     font = _font(16)
     draw.text(
         ((width - draw.textlength(area_line, font=font)) / 2, ty), area_line, font=font, fill=BLACK

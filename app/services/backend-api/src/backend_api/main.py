@@ -14,6 +14,7 @@ from plan_core import (
     Change,
     PlanGeometry,
     apply_ops,
+    clear_internal_area,
     diff_geometries,
     parse_ops,
     register_hunk,
@@ -32,10 +33,30 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("backend-api")
 
 
+SANDBOX_PREFIX = "sandbox-"
+
+
+def _sweep_sandboxes() -> None:
+    """Remove leftover Feature-Checks sandboxes (crashed runs)."""
+    with session() as db:
+        for plan in db.execute(select(Plan).where(Plan.slug.like(f"{SANDBOX_PREFIX}%"))).scalars():
+            for review in db.execute(select(Review).where(Review.plan_id == plan.id)).scalars():
+                for v in _versions(db, review.id):
+                    db.delete(v)
+                for job in db.execute(select(Job).where(Job.review_id == review.id)).scalars():
+                    db.delete(job)
+                db.flush()  # children first — no relationships declared, so order manually
+                db.delete(review)
+            db.flush()
+            db.delete(plan)
+        db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     seed_if_empty()
+    _sweep_sandboxes()
     yield
 
 
@@ -69,7 +90,8 @@ def _version_summary(v: Version) -> dict[str, Any]:
         "rent": v.rent,
         "changes": v.changes,
         "config": geo.summary_config(),
-        "internal_area": round(geo.internal_area(), 1),
+        # internal area is CLEAR (wall faces), envelope area stays footprint
+        "internal_area": round(clear_internal_area(geo), 1),
         "total_area": round(geo.total_area(), 1),
         "saved": v.saved,
         "created_at": v.created_at.isoformat(),
@@ -111,6 +133,8 @@ def list_plans() -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     with session() as db:
         for plan in db.execute(select(Plan).order_by(Plan.created_at)).scalars():
+            if plan.slug.startswith(SANDBOX_PREFIX):
+                continue
             review = db.execute(
                 select(Review).where(Review.plan_id == plan.id)
             ).scalar_one_or_none()
@@ -470,6 +494,68 @@ def plan_image(plan_id: str) -> FileResponse:
         path = plan.image_path
     media = "image/png" if path.endswith("png") else "image/jpeg"
     return FileResponse(path, media_type=media)
+
+
+# ---------- Feature Checks sandbox ----------
+
+
+@app.post("/api/admin/sandbox", status_code=201)
+def create_sandbox() -> dict[str, str]:
+    """Throwaway review (clone of the seed original) for the Feature Checks tab.
+    Hidden from the library; deleted after the run and swept on startup."""
+    with session() as db:
+        source = db.execute(
+            select(Plan).where(Plan.slug.not_like(f"{SANDBOX_PREFIX}%")).order_by(Plan.created_at)
+        ).scalar_one_or_none()
+        if not source:
+            raise HTTPException(409, "no seed plan to clone")
+        src_review = db.execute(
+            select(Review).where(Review.plan_id == source.id)
+        ).scalar_one_or_none()
+        if not src_review:
+            raise HTTPException(409, "seed plan has no review")
+        v0 = _versions(db, src_review.id)[0]
+        sandbox_id = uuid.uuid4().hex[:8]
+        plan = Plan(slug=f"{SANDBOX_PREFIX}{sandbox_id}", address="[feature-checks sandbox]")
+        db.add(plan)
+        db.flush()
+        review = Review(plan_id=plan.id, baseline_per_week=900)
+        db.add(review)
+        db.flush()
+        db.add(
+            Version(
+                review_id=review.id,
+                n=0,
+                geometry=v0.geometry,
+                changes=[],
+                register=[],
+                rent={"currency": "AUD", "baseline_per_week": 900, "proposed_per_week": 900},
+                saved=True,
+            )
+        )
+        db.commit()
+        return {"review_id": review.id, "plan_id": plan.id}
+
+
+@app.delete("/api/admin/sandbox/{review_id}")
+def delete_sandbox(review_id: str) -> dict[str, bool]:
+    with session() as db:
+        review = db.get(Review, review_id)
+        if not review:
+            raise HTTPException(404, "sandbox not found")
+        plan = db.get(Plan, review.plan_id)
+        if not plan or not plan.slug.startswith(SANDBOX_PREFIX):
+            raise HTTPException(403, "not a sandbox review")
+        for v in _versions(db, review_id):
+            db.delete(v)
+        for job in db.execute(select(Job).where(Job.review_id == review_id)).scalars():
+            db.delete(job)
+        db.flush()  # children before parents — no ORM relationships to infer order from
+        db.delete(review)
+        db.flush()
+        db.delete(plan)
+        db.commit()
+    return {"deleted": True}
 
 
 # ---------- exports & comps ----------

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api';
 import Sidebar from './components/Sidebar';
+import Admin from './pages/Admin';
 import Ingest from './pages/Ingest';
 import Library from './pages/Library';
 import Review from './pages/Review';
@@ -9,6 +10,7 @@ import type { PlanListItem } from './types';
 export type Route =
   | { page: 'library'; id: '' }
   | { page: 'upload'; id: '' }
+  | { page: 'admin'; id: '' }
   | { page: 'review'; id: string }
   | { page: 'ingest'; id: string }
   | { page: 'lost'; id: '' };
@@ -19,6 +21,7 @@ function route(hash: string): Route {
   const ingest = hash.match(/^#\/ingest\/([a-z0-9-]+)/i);
   if (ingest) return { page: 'ingest', id: ingest[1] };
   if (/^#\/upload/.test(hash)) return { page: 'upload', id: '' };
+  if (/^#\/admin/.test(hash)) return { page: 'admin', id: '' };
   if (!hash || hash === '#' || hash === '#/') return { page: 'library', id: '' };
   return { page: 'lost', id: '' };
 }
@@ -68,6 +71,7 @@ export default function App() {
           <Review key={current.id} reviewId={current.id} onBusyChange={setBusy} onVersionAdded={refreshPlans} />
         )}
         {current.page === 'ingest' && <Ingest key={current.id} planId={current.id} />}
+        {current.page === 'admin' && <Admin />}
         {(current.page === 'library' || current.page === 'upload' || current.page === 'lost') && (
           <Library uploadFocus={current.page === 'upload'} notFound={current.page === 'lost'} />
         )}

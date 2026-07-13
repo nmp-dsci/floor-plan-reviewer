@@ -1,0 +1,481 @@
+<title>Plan Canvas — Human/AI Parity PRD</title>
+<style>
+  :root {
+    --ink: #141416; --paper: #ffffff; --grey: #e1e1e3; --grey-2: #f4f4f5; --faint: #74747a;
+    --red: #e23d28; --green: #1a7f37; --green-bg: #e6f4ea; --red-bg: #fdecea;
+    --amber: #9a6700; --amber-bg: #fff3d6;
+    --mono: 'SF Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; min-width: 0; }
+  :where(p, h1, h2, h3, h4, li, td, th, dd) { overflow-wrap: anywhere; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.5; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 22px 80px; }
+  header.site { border-bottom: 4px solid var(--ink); padding-bottom: 16px; margin-bottom: 26px; }
+  .kicker { font-size: 12px; letter-spacing: 0.22em; color: var(--faint); text-transform: uppercase; }
+  h1 { margin: 8px 0 4px; font-size: 26px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .sub { color: var(--faint); font-size: 14px; max-width: 76ch; }
+  .statline { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .stat { border: 2px solid var(--ink); padding: 6px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .stat b { font-size: 15px; letter-spacing: 0; display: block; }
+  .stat.now { background: var(--ink); color: var(--paper); }
+
+  section { margin: 40px 0; }
+  h2.sec { font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; border-bottom: 3px solid var(--ink);
+    padding-bottom: 8px; margin: 0 0 6px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  h2.sec .n { color: var(--red); }
+  h2.sec small { color: var(--faint); letter-spacing: 0.04em; font-weight: 400; text-transform: none; font-size: 12.5px; }
+  .lede { font-size: 14px; max-width: 82ch; margin: 10px 0 16px; }
+  .lede em { color: var(--faint); }
+
+  .card { border: 3px solid var(--ink); background: var(--paper); margin: 14px 0; }
+  .card > h3 { margin: 0; padding: 8px 12px; font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase;
+    border-bottom: 3px solid var(--ink); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .card > h3 small { color: var(--faint); letter-spacing: 0.03em; font-weight: 400; text-transform: none; }
+  .card .body { padding: 14px; }
+
+  table.list { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.list td, table.list th { border-bottom: 1px solid var(--grey); padding: 8px 9px; text-align: left; vertical-align: top; }
+  table.list th { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 2px solid var(--ink); white-space: nowrap; }
+  table.list tr.group td { background: var(--ink); color: var(--paper); font-size: 10.5px; letter-spacing: 0.16em;
+    text-transform: uppercase; padding: 5px 9px; }
+  .tbl-scroll { overflow-x: auto; }
+  code { font-family: var(--mono); font-size: 12px; background: var(--grey-2); padding: 1px 5px; }
+  .chip { display: inline-block; border: 1.5px solid var(--red); color: var(--red); font-size: 9.5px;
+    text-transform: uppercase; letter-spacing: 0.05em; padding: 0 6px; white-space: nowrap; }
+  .chip.ok { border-color: var(--green); color: var(--green); }
+  .chip.dim { border-color: var(--grey); color: var(--faint); }
+  .chip.amber { border-color: var(--amber); color: var(--amber); }
+  .chip.ink { border-color: var(--ink); color: var(--ink); }
+  .sev { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; padding: 2px 7px; text-transform: uppercase; white-space: nowrap; }
+  .sev.bug { background: var(--red); color: #fff; }
+  .sev.gap { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber); }
+  .sev.ok { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+  .sev.part { background: var(--grey-2); color: var(--ink); border: 1px solid var(--ink); }
+
+  .mermaid { display: flex; justify-content: center; margin: 10px 0; overflow-x: auto; }
+
+  .phase { display: grid; grid-template-columns: 88px minmax(0,1fr); border: 3px solid var(--ink); margin-bottom: 12px; }
+  .phase .pn { background: var(--ink); color: var(--paper); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 6px; }
+  .phase .pn b { font-size: 20px; }
+  .phase .pn span { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: #9c9ca4; text-align: center; }
+  .phase .pb { padding: 12px 14px; }
+  .phase .pb h4 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .phase .pb ul { margin: 6px 0; padding-left: 18px; font-size: 13.5px; }
+  .phase .pb li { margin-bottom: 4px; }
+  .phase .pb .accept { font-size: 12px; color: var(--faint); border-top: 1px solid var(--grey); margin-top: 8px; padding-top: 7px; }
+  .phase .pb .accept b { color: var(--green); text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; }
+
+  .risk { border-left: 4px solid var(--amber); background: var(--grey-2); padding: 10px 12px; margin-bottom: 10px; font-size: 13.5px; }
+  .risk b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .decision { border: 3px solid var(--ink); margin-bottom: 16px; }
+  .decision h3 { margin: 0; padding: 8px 12px; font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; border-bottom: 3px solid var(--ink); background: var(--grey-2); }
+  .decision .body { padding: 12px 14px; }
+  .decision label.opt { display: flex; gap: 10px; align-items: flex-start; border: 2px solid var(--grey); padding: 10px 12px; margin-bottom: 8px; cursor: pointer; font-size: 13.5px; }
+  .decision label.opt:hover { border-color: var(--ink); }
+  .decision label.opt input { margin-top: 3px; accent-color: var(--red); }
+  .decision label.opt b { display: block; font-size: 13px; }
+  .decision label.opt .why { color: var(--faint); font-size: 12.5px; }
+  .decision .rec { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: var(--green); text-transform: uppercase; margin-left: 6px; }
+  .decision button { border: 3px solid var(--ink); background: var(--ink); color: var(--paper); font: inherit;
+    font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-size: 11px; padding: 7px 14px; cursor: pointer; }
+  .decision button:hover { background: var(--red); border-color: var(--red); }
+  .queued-note { font-size: 11.5px; color: var(--green); margin-top: 6px; display: none; }
+
+  /* admin mock */
+  .mockframe { border: 3px solid var(--ink); box-shadow: 8px 8px 0 var(--grey); margin: 16px 0 8px; overflow: hidden; }
+  .mockbar { display: flex; gap: 6px; align-items: center; padding: 7px 10px; border-bottom: 3px solid var(--ink); background: var(--grey-2); }
+  .mockbar i { width: 10px; height: 10px; border: 2px solid var(--ink); border-radius: 50%; display: inline-block; }
+  .mockbar .url { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-left: 8px; }
+  .adminshell { display: grid; grid-template-columns: 190px minmax(0,1fr); }
+  @media (max-width: 720px) { .adminshell { grid-template-columns: minmax(0,1fr); } .anav { display: none; } }
+  .anav { background: var(--ink); color: var(--paper); padding: 12px 0; font-size: 12px; }
+  .anav .b { padding: 2px 14px 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; font-size: 11px; border-bottom: 1px solid #3a3a3e; margin-bottom: 8px; }
+  .anav .i { padding: 7px 14px; border-left: 3px solid transparent; color: #d7d7db; }
+  .anav .i.on { border-left-color: var(--red); background: #232327; color: #fff; }
+  .amain { padding: 14px; }
+  .amain .ahead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .amain .ahead h4 { margin: 0; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .amain .runbtn { border: 3px solid var(--ink); background: var(--ink); color: var(--paper); font-size: 10px;
+    font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 5px 12px; }
+  .amain .sumchips { margin-left: auto; display: flex; gap: 6px; font-family: var(--mono); font-size: 11px; }
+  .amain table { border-collapse: collapse; width: 100%; font-size: 11.5px; }
+  .amain td, .amain th { border-bottom: 1px solid var(--grey); padding: 5px 7px; text-align: left; vertical-align: top; }
+  .amain th { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 2px solid var(--ink); }
+  .pass { color: var(--green); font-weight: 700; font-family: var(--mono); font-size: 10.5px; }
+  .fail { color: var(--red); font-weight: 700; font-family: var(--mono); font-size: 10.5px; }
+  .example-row td { background: var(--grey-2); font-size: 11px; color: var(--faint); font-family: var(--mono); }
+
+  /* dims diagram */
+  .dimgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; max-width: 620px; margin: 8px auto 14px; }
+  .dimgrid figure { margin: 0; text-align: center; }
+  .dimgrid figcaption { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+  .dimgrid svg { display: block; width: 100%; height: auto; }
+  .dimgrid .m { font-family: var(--mono); font-size: 12px; font-weight: 700; margin-top: 6px; }
+  .dimgrid .c { font-size: 11px; color: var(--faint); margin-top: 2px; }
+  footer { margin-top: 48px; font-size: 11.5px; color: var(--faint); text-align: center; border-top: 1px solid var(--grey); padding-top: 16px; }
+</style>
+
+<div class="wrap">
+  <header class="site">
+    <div class="kicker">Floor-Plan Studio · plan-canvas parity PRD · 2026-07-13</div>
+    <h1>The canvas obeys the human, not just the AI</h1>
+    <div class="sub">
+      PRD for full user control of the plan canvas with human ⇄ agent parity, produced the way the
+      request demanded: <b>every reported error was re-created in the live app first</b> (evidence in
+      §01, real numbers throughout). Core outcomes: one root cause fixed (pending objects are frozen),
+      three missing wall controls added, a single honest dimension standard (clear size, walls
+      excluded), and an <b>Feature Checks tab</b> in the app where every canvas feature is listed with
+      how the human uses it, how the AI uses it, and a live PASS/FAIL check.
+    </div>
+    <div class="statline">
+      <div class="stat now"><b>7 complaints</b> all re-created live</div>
+      <div class="stat"><b>4 bugs</b> + 1 gap + 2 work-with-caveats</div>
+      <div class="stat"><b>1 root cause</b> pv-object lockout</div>
+      <div class="stat"><b>26 features</b> in the parity matrix</div>
+      <div class="stat now"><b>BUILDING</b> W1–W6 all in scope</div>
+      <div class="stat"><b>4 decisions</b> locked 2026-07-13</div>
+    </div>
+  </header>
+
+  <!-- ============ 01 WALKTHROUGH ============ -->
+  <section>
+    <h2 class="sec"><span class="n">01</span> Walkthrough — every complaint re-created in the running app <small>driven live on the v03 head; no versions touched</small></h2>
+    <div class="card">
+      <div class="tbl-scroll"><table class="list">
+        <thead><tr><th>Verdict</th><th>Complaint</th><th>What actually happens (measured)</th><th>Root cause → fix</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="sev bug">BUG</span></td>
+            <td>“Click wall and try to expand — doesn’t work”</td>
+            <td>Selecting a wall shows two drag handles. Dragging one only changed the <b>selection span</b> (“1.3m chunk”) — pending ops stayed at <code>0</code>, geometry untouched. The handles are a chunk <em>picker</em> that looks like a resize control.</td>
+            <td>No wall-resize interaction exists → <b>W2</b> real wall drag; relabel the picker as “span” with distinct styling.</td>
+          </tr>
+          <tr>
+            <td><span class="sev bug">BUG</span></td>
+            <td>“I can’t drag and move walls”</td>
+            <td>The selected wall’s red bar is <code>pointer-events: none</code>; dragging it produced <code>0</code> ops. There is no way to move a wall at all — the AI does it via <code>resize_room</code>, humans can’t.</td>
+            <td>Missing interaction → <b>W2</b>: drag a wall perpendicular = both adjacent rooms resize live (the shared wall moves).</td>
+          </tr>
+          <tr>
+            <td><span class="sev gap">GAP</span></td>
+            <td>“I can add walls” <em>(read: there’s no way to)</em></td>
+            <td>Correct — the AI has <code>split_room</code> (used in v01–v03 seed history), the human has no tool that emits it.</td>
+            <td>Parity gap → <b>W2</b>: Add-wall tool — draw a line across a room → <code>split_room</code>.</td>
+          </tr>
+          <tr>
+            <td><span class="sev ok">WORKS</span></td>
+            <td>“I can add rooms”</td>
+            <td>The + Room tool works (draw space → name → <code>add_room</code>)… but the new room is then <b>stuck</b> — see the duplicate row. Same root cause.</td>
+            <td>Works; inherits the pv-lockout fix from <b>W1</b>.</td>
+          </tr>
+          <tr>
+            <td><span class="sev bug">BUG</span></td>
+            <td>“I can’t label fixtures”</td>
+            <td>Drawing a fixture queues <code>add fixture unit 1.1 x 0.8m</code> — then <b>nothing opens</b> and the preview fixture has <code>0</code> hit-rects: unselectable, unlabellable until applied. (Existing fixtures label fine.)</td>
+            <td>pv-lockout + no label prompt on create → <b>W1</b> pending editable + <b>W3</b> label field focused immediately after draw.</td>
+          </tr>
+          <tr>
+            <td><span class="sev part">PARTIAL</span></td>
+            <td>“I can’t click on a room and rename it”</td>
+            <td>For existing rooms it works: click room → Inspector Name field → Enter (verified live). But it’s off-canvas and easy to miss, and a <b>new</b> (pending) room can’t be renamed at all.</td>
+            <td>Discoverability + pv-lockout → <b>W3</b> double-click the room label to rename in place; <b>W1</b> for pending rooms.</td>
+          </tr>
+          <tr>
+            <td><span class="sev bug">BUG</span></td>
+            <td>“When I duplicate a room it’s stuck”</td>
+            <td>Confirmed, twice over. Duplicating BED 3 (x 9.1, w 3.0) places the copy at <b>x 12.25–15.25 — outside the 12.1m envelope</b>, so Apply would be rejected. And the copy is a preview (pv-) object with <code>0</code> hit-rects, so you can’t drag it back inside or rename it. Your only exit is discarding.</td>
+            <td>Naive placement + pv-lockout → <b>W1</b>: copies clamp inside the envelope into free space, and pending objects are fully editable.</td>
+          </tr>
+          <tr>
+            <td><span class="sev bug">BUG</span></td>
+            <td><em>Found while testing:</em> three different sizes for one room</td>
+            <td>BED 3 shows label <b>“3.1 × 3.1m”</b> (authored in the source file), its rect is <b>3.00 × 3.00</b>, and its true clear size — walls subtracted — is <b>2.85 × 2.85</b>. Three numbers, none of them the one a renter measures.</td>
+            <td>dims-string override + no wall-aware maths → <b>W4</b> one standard: clear dimensions everywhere.</td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ============ 02 ROOT CAUSE ============ -->
+  <section>
+    <h2 class="sec"><span class="n">02</span> The root cause behind four complaints — the pending-object lockout <small>a deliberate trade-off that must now be fixed properly</small></h2>
+    <p class="lede">
+      When you add or duplicate anything, the op batches locally and the canvas draws a <em>preview</em>
+      object with a temporary id (<code>pv-room1</code>). Yesterday’s 500-error fix made those preview
+      objects <b>unselectable</b> — the safe-but-blunt way to stop edits referencing ids the server
+      never sees. That is exactly why new rooms are stuck, copies can’t be moved, new fixtures can’t
+      be labelled. The proper fix: edits on a pending object <b>rewrite its pending op in place</b> —
+      drag the copy, the queued <code>add_room</code>’s x/y updates; rename it, the op’s name updates.
+      No pv-id ever reaches the server (the server-side guard stays as a backstop).
+    </p>
+    <div class="card"><div class="body">
+      <div class="mermaid">
+flowchart LR
+    subgraph today["TODAY — why things feel stuck"]
+      A1["Duplicate / + Room / + Fixture"] --> A2["pending add op<br/>preview id pv-room1"]
+      A2 --> A3["preview has NO hit-rects<br/>(500-fix lockout)"]
+      A3 --> A4["can't move · rename · label<br/>until Apply — and Apply may<br/>reject (outside envelope)"]
+    end
+    subgraph target["TARGET — pending objects are first-class (W1)"]
+      B1["Duplicate / + Room / + Fixture"] --> B2["pending add op<br/>preview id pv-room1"]
+      B2 --> B3["preview IS selectable:<br/>drag/rename/label REWRITE<br/>the pending op in place"]
+      B3 --> B4["Apply sends clean ops —<br/>server guard never trips"]
+    end
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ============ 03 PARITY MATRIX ============ -->
+  <section>
+    <h2 class="sec"><span class="n">03</span> The parity contract — every canvas feature, human vs AI <small>this exact matrix ships inside the app as the Feature Checks tab (§05)</small></h2>
+    <p class="lede">
+      One row per capability. <b>Human</b> = the direct interaction; <b>AI</b> = how the agent does the
+      same thing through the identical validated op pipeline; <b>Self-test</b> = the automated check the
+      Feature Checks tab runs to prove it still works. <span class="chip amber">NEW</span> = doesn’t exist yet ·
+      <span class="chip">FIX</span> = exists but broken per §01.
+    </p>
+    <div class="card">
+      <div class="tbl-scroll"><table class="list">
+        <thead><tr><th>#</th><th>Feature</th><th>Human — how you do it</th><th>AI — how the agent does it</th><th>Self-test check</th></tr></thead>
+        <tbody>
+          <tr class="group"><td colspan="5">Rooms</td></tr>
+          <tr><td>1</td><td>Select / multi-select</td><td>Click a room; shift-click or long-press for multi; Esc clears</td><td>Comment targets carry room ids</td><td>Selection state holds N rooms</td></tr>
+          <tr><td>2</td><td>Rename <span class="chip">FIX</span></td><td>Double-click the room label (inline input) or Inspector Name + Enter — incl. pending rooms</td><td><code>rename</code> / <code>set_kind(name)</code></td><td>Rename lands; canvas label updates</td></tr>
+          <tr><td>3</td><td>Change kind / fill</td><td>Inspector Kind + Fill selects</td><td><code>set_kind</code> (study→bedroom etc.)</td><td>Kind change updates config summary</td></tr>
+          <tr><td>4</td><td>Move</td><td>Drag the room body, 0.05m snap</td><td><code>resize_room</code> (new x/y)</td><td>Op emitted; validator accepts; no overlap</td></tr>
+          <tr><td>5</td><td>Resize</td><td>Corner handle drag or numeric x/y/w/h fields</td><td><code>resize_room</code> (new w/h)</td><td>Min 0.7m enforced; dims label refreshes</td></tr>
+          <tr><td>6</td><td>Add</td><td>+ Room → drag out the space → name it</td><td><code>add_room</code> (incl. from a region target)</td><td>Room appears with id, kind, dims</td></tr>
+          <tr><td>7</td><td>Duplicate <span class="chip">FIX</span></td><td>Duplicate button or ⌘C/⌘V — copy clamps inside the envelope and stays editable before Apply</td><td><code>add_room</code> with copied rect</td><td>Copy inside envelope; movable pre-apply</td></tr>
+          <tr><td>8</td><td>Remove</td><td>Delete key or Remove room button</td><td><code>remove_room</code></td><td>Room gone; walls re-derive</td></tr>
+          <tr><td>9</td><td>Merge two rooms <span class="chip amber">NEW</span></td><td>Multi-select exactly 2 → Merge button</td><td><code>merge_rooms</code></td><td>Union rect valid; other id removed</td></tr>
+          <tr class="group"><td colspan="5">Walls &amp; openings</td></tr>
+          <tr><td>10</td><td>Select wall / side</td><td>Click picks the solid segment between openings (whole wall if none)</td><td>Wall ids in comment targets</td><td>Clicked side = bounded segment</td></tr>
+          <tr><td>11</td><td>Pick a span <span class="chip">FIX</span></td><td>Drag the two handles — restyled + relabelled “span” so it can’t be mistaken for resize</td><td>t0/t1 fractions in targets</td><td>Span maths match wall length</td></tr>
+          <tr><td>12</td><td>Move a wall <span class="chip amber">NEW</span></td><td>Drag the selected wall perpendicular — both adjacent rooms resize live, 0.7m min clamps, envelope walls refuse</td><td><code>resize_room</code> on the neighbours</td><td>Two resize ops; areas conserve; no overlap</td></tr>
+          <tr><td>13</td><td>Add a wall <span class="chip amber">NEW</span></td><td>+ Wall → draw a line across a room → names the new room</td><td><code>split_room</code> (axis, at)</td><td>Two rooms after; both ≥ 0.7m</td></tr>
+          <tr><td>14</td><td>Open a wall chunk</td><td>Select side/span → “Open this chunk”</td><td><code>remove_wall_chunk</code></td><td>Open span appears in geometry</td></tr>
+          <tr><td>15</td><td>Add opening</td><td>+ Opening → click a wall (0.9m door); or + door / + window on a selection</td><td><code>add_opening</code> (door/window/open)</td><td>Opening on wall at clicked t</td></tr>
+          <tr><td>16</td><td>Move / resize opening</td><td>Drag its end handles along the wall</td><td><code>modify_opening</code> (t0/t1)</td><td>Ends move; span label updates</td></tr>
+          <tr><td>17</td><td>Retype / remove opening</td><td>door/window/open toggle · remove · Delete key</td><td><code>modify_opening</code> / <code>remove_opening</code></td><td>Type flips; removal restores wall</td></tr>
+          <tr><td>18</td><td>Copy opening</td><td>⌘C/⌘V or Duplicate — pastes along the same wall</td><td><code>add_opening</code> beside the source</td><td>Second opening fits or is declined</td></tr>
+          <tr class="group"><td colspan="5">Fixtures (thin-line joinery)</td></tr>
+          <tr><td>19</td><td>Add <span class="chip">FIX</span></td><td>+ Fixture → draw — label field opens focused immediately</td><td><code>add_fixture</code></td><td>Fixture exists with stable id</td></tr>
+          <tr><td>20</td><td>Label / rename <span class="chip">FIX</span></td><td>Inspector Label + Enter — incl. pending fixtures</td><td><code>modify_fixture(label)</code></td><td>Label renders on canvas when it fits</td></tr>
+          <tr><td>21</td><td>Move / resize</td><td>Drag body / corner handle</td><td><code>modify_fixture</code> (x/y/w/h)</td><td>Rect updates; snap holds</td></tr>
+          <tr><td>22</td><td>Duplicate</td><td>Duplicate button or ⌘C/⌘V</td><td><code>add_fixture</code> copy</td><td>Copy offset; editable pre-apply</td></tr>
+          <tr><td>23</td><td>Remove</td><td>Delete key or Remove button</td><td><code>remove_fixture</code> by id</td><td>Gone from geometry + register line</td></tr>
+          <tr class="group"><td colspan="5">Space, batch &amp; versions</td></tr>
+          <tr><td>24</td><td>Target empty space</td><td>+ Room drag → either name it yourself or send the region to the agent</td><td>Region rect in targets → <code>add_room</code></td><td>Region round-trips to a valid room</td></tr>
+          <tr><td>25</td><td>Batch preview + apply</td><td>Edits stack (amber/green preview) → one Apply = one version; ⌘Z pops; Discard clears</td><td>One comment batch = one version</td><td>Preview geometry == applied geometry</td></tr>
+          <tr><td>26</td><td>Undo / versions</td><td>⌘Z rolls back head when nothing pending; delete vNN; ★ bookmark survives pruning</td><td>Same version API</td><td>Rollback → previous kept version</td></tr>
+          <tr class="group"><td colspan="5">Contracts (checked on every apply)</td></tr>
+          <tr><td>C1</td><td>Dims always visible</td><td colspan="2">Every room label carries dimensions at every zoom — human and agent edits both reset stale authored dims</td><td>No room without a dims label</td></tr>
+          <tr><td>C2</td><td>Clear dimensions <span class="chip amber">NEW</span></td><td colspan="2">Canvas, register and PNG export all show <b>clear size</b> (wall thickness subtracted) — §04</td><td>BED 3 reads 2.85 × 2.85m clear</td></tr>
+          <tr><td>C3</td><td>Envelope immutable</td><td colspan="2">Footprint width/length and boundary can never change — validator rejects either author’s edit identically</td><td>Oversize resize rejected with 422</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ============ 04 CLEAR DIMS ============ -->
+  <section>
+    <h2 class="sec"><span class="n">04</span> Clear dimensions — one honest number <small>walls subtracted; verified against live geometry</small></h2>
+    <p class="lede">
+      Room rects span to the wall <em>centreline gap</em>, so today’s labels overstate usable space —
+      and some rooms still carry a third, hand-authored number from the source file. The standard
+      becomes: <b>the label is the clear internal size</b> — rect span minus each side’s wall
+      encroachment (wall inner face → room edge). Live worked example, BED 3:
+      encroachment left 0.04 · right 0.11 · top 0.11 · bottom 0.04 →
+      <b>3.00 × 3.00 rect ⇒ 2.85 × 2.85m clear</b>.
+    </p>
+    <div class="card"><div class="body">
+      <div class="dimgrid">
+        <figure>
+          <figcaption>Today · rect span</figcaption>
+          <svg viewBox="0 0 240 150">
+            <rect x="15" y="10" width="210" height="130" fill="#fff" stroke="#141416" stroke-width="10"/>
+            <line x1="10" y1="75" x2="230" y2="75" stroke="#e23d28" stroke-width="1.5"/>
+            <line x1="10" y1="69" x2="10" y2="81" stroke="#e23d28" stroke-width="1.5"/>
+            <line x1="230" y1="69" x2="230" y2="81" stroke="#e23d28" stroke-width="1.5"/>
+          </svg>
+          <div class="m" style="color:var(--red)">3.00 m — includes wall</div>
+          <div class="c">and the authored label even says “3.1”</div>
+        </figure>
+        <figure>
+          <figcaption>Target · clear size</figcaption>
+          <svg viewBox="0 0 240 150">
+            <rect x="15" y="10" width="210" height="130" fill="#fff" stroke="#141416" stroke-width="10"/>
+            <line x1="25" y1="75" x2="215" y2="75" stroke="#1a7f37" stroke-width="1.5"/>
+            <line x1="25" y1="69" x2="25" y2="81" stroke="#1a7f37" stroke-width="1.5"/>
+            <line x1="215" y1="69" x2="215" y2="81" stroke="#1a7f37" stroke-width="1.5"/>
+          </svg>
+          <div class="m" style="color:var(--green)">2.85 m clear</div>
+          <div class="c">inner wall face to inner wall face</div>
+        </figure>
+      </div>
+      <div class="tbl-scroll"><table class="list">
+        <thead><tr><th>Rule</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>Formula</td><td><code>clear = rect span − Σ per-side max(0, wall inner face − room edge)</code>, computed from the derived walls (interior half 0.09m, exterior 0.11m). Implemented once in <code>geometry.ts</code> + mirrored in <code>plan-core</code> so register/describe/export agree.</td></tr>
+          <tr><td>Canvas labels</td><td>Show clear size (decision Q2 covers whether rect shows too). Authored <code>dims</code> strings from source files are retired — no more “3.1 × 3.1”.</td></tr>
+          <tr><td>Inspector</td><td>x/y/w/h fields stay in rect space (that’s op space) with a live “≈ 2.85 × 2.85m clear” readout beside them.</td></tr>
+          <tr><td>Register / export / areas</td><td>describe() lines, PNG export labels, and the m² figures in the context bar all switch to clear numbers.</td></tr>
+          <tr><td>Contract</td><td>Feature check C2: every room’s clear size ≥ 0; BED 3 fixture case asserts 2.85 × 2.85 ± 0.01.</td></tr>
+        </tbody>
+      </table></div>
+    </div></div>
+  </section>
+
+  <!-- ============ 05 ADMIN TAB ============ -->
+  <section>
+    <h2 class="sec"><span class="n">05</span> Feature Checks tab — the app tests itself <small>the §03 matrix, live in the product, with PASS/FAIL per feature</small></h2>
+    <p class="lede">
+      New sidebar destination: <b>Feature Checks</b>. It renders the parity matrix from a single
+      registry (<code>features.ts</code>: id, name, human-how, AI-how, example, check) and <b>Run all
+      checks</b> executes every row against a throwaway sandbox review — created by
+      <code>POST /api/admin/sandbox</code> (clones the seed original), exercised through the same
+      <code>/edits</code> pipeline humans and the agent use, deleted afterwards. Your data is never
+      touched. Each row can expand to show its example op and the assertion that ran.
+    </p>
+    <div class="mockframe">
+      <div class="mockbar"><i></i><i></i><i></i><span class="url">localhost:5175/#/admin</span></div>
+      <div class="adminshell">
+        <nav class="anav">
+          <div class="b">Floor-Plan Studio</div>
+          <div class="i">Library</div>
+          <div class="i">Upload plan</div>
+          <div class="i on">Feature Checks</div>
+        </nav>
+        <div class="amain">
+          <div class="ahead">
+            <h4>Plan-canvas feature checks</h4>
+            <span class="runbtn">Run all checks</span>
+            <span class="sumchips"><span class="pass">24 PASS</span> · <span class="fail">2 FAIL</span> · last run 09:41</span>
+          </div>
+          <table>
+            <thead><tr><th>Feature</th><th>Human</th><th>AI</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td><b>Move room</b></td><td>drag body, 0.05m snap</td><td>resize_room</td><td class="pass">PASS 0.4s</td></tr>
+              <tr><td><b>Duplicate room</b></td><td>⌘C/⌘V · clamps in envelope</td><td>add_room copy</td><td class="fail">FAIL ▸</td></tr>
+              <tr class="example-row"><td colspan="4">example: add_room{name:"BED 3 copy", x:12.25…} → 422 room breaks the building envelope — copy must clamp inside (W1)</td></tr>
+              <tr><td><b>Move wall</b></td><td>drag ⟂ · both rooms resize</td><td>resize_room ×2</td><td class="pass">PASS 0.6s</td></tr>
+              <tr><td><b>Label fixture</b></td><td>label on create + Enter</td><td>modify_fixture</td><td class="pass">PASS 0.3s</td></tr>
+              <tr><td><b>Clear dims C2</b></td><td colspan="2">BED 3 = 2.85 × 2.85m clear</td><td class="pass">PASS 0.2s</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <p class="lede" style="font-size:12.5px">
+      Mechanics: each check asserts twice — the local preview (<code>applyOpsPreview</code>) and the
+      server round-trip (<code>/edits</code> on the sandbox) must agree, which is precisely the
+      human/AI parity guarantee. Results cache in <code>localStorage</code> with a timestamp; a red
+      count in the sidebar badge when anything fails. W6 optionally mirrors the same registry as a
+      Playwright suite in CI.
+    </p>
+  </section>
+
+  <!-- ============ 06 WORKSTREAMS ============ -->
+  <section>
+    <h2 class="sec"><span class="n">06</span> Workstreams <small>each lands green (pytest · mypy · ruff · tsc · smoke) and demoable</small></h2>
+
+    <div class="phase"><div class="pn"><b>W1</b><span>pending editable</span></div><div class="pb">
+      <h4>Pending objects are first-class (kills 4 complaints)</h4>
+      <ul>
+        <li><code>editing.ts</code>: selection can hold a pending-op reference; move/rename/label/resize on a pv object rewrites its originating <code>add_room</code>/<code>add_fixture</code> op in place (never emits pv ids — server guard stays as backstop).</li>
+        <li><code>PlanCanvas</code>: restore hit-rects + drag/handles for pv objects, wired to op-rewrite instead of new ops.</li>
+        <li>Duplicate placement: probe right/left/below/above and clamp inside the envelope; overlap allowed in preview (validator arbitrates on Apply, error shown inline on the copy).</li>
+      </ul>
+      <div class="accept"><b>Accept:</b> duplicate BED 3 → copy lands inside the envelope, drag it into free space, rename it, Apply succeeds. Draw a fixture → label it before Apply.</div>
+    </div></div>
+
+    <div class="phase"><div class="pn"><b>W2</b><span>wall control</span></div><div class="pb">
+      <h4>Walls obey the mouse (move · add · merge)</h4>
+      <ul>
+        <li>Move wall: drag a selected interior wall perpendicular → live preview resizing both adjacent rooms (<code>resize_room</code> ×2 on release), 0.7m min clamps; exterior walls refuse with an “envelope is immutable” hint. Semantics per decision Q1.</li>
+        <li>Add wall: + Wall tool — draw across a room → <code>split_room</code> (axis/at from the line, name prompt for the new room).</li>
+        <li>Merge rooms: multi-select exactly two → Merge button → <code>merge_rooms</code> (rectangular-union guard surfaces as inline error).</li>
+        <li>Span picker restyle: hollow handles + “span” label so it reads as selection, not resize.</li>
+      </ul>
+      <div class="accept"><b>Accept:</b> drag the bed-3↔hall wall 0.3m → both rooms’ dims update in one version; draw a wall across the living room → two named rooms; merging them back restores it.</div>
+    </div></div>
+
+    <div class="phase"><div class="pn"><b>W3</b><span>inline naming</span></div><div class="pb">
+      <h4>Rename where you look</h4>
+      <ul>
+        <li>Per Q4: selecting a room or fixture autofocuses + selects the Inspector Name/Label field; Enter queues the rename.</li>
+        <li>After + Fixture draw, Duplicate, and + Room add, the new (pending) object is auto-selected so the field is ready to type into.</li>
+      </ul>
+      <div class="accept"><b>Accept:</b> select BED 3 → Name is focused; type STUDY, Enter → pending rename. Drawing a fixture puts the cursor in Label immediately.</div>
+    </div></div>
+
+    <div class="phase"><div class="pn"><b>W4</b><span>clear dims</span></div><div class="pb">
+      <h4>One honest dimension standard</h4>
+      <ul>
+        <li><code>geometry.ts clearSize(room, walls)</code> per §04; canvas labels switch to clear size (Q2); inspector shows live clear readout.</li>
+        <li><code>plan-core</code>: same maths for <code>describe()</code>, register lines, PNG export, and the context-bar m² figures; authored <code>dims</code> overrides retired.</li>
+        <li>Unit tests pinned to the live worked example (BED 3 → 2.85 × 2.85 ± 0.01).</li>
+      </ul>
+      <div class="accept"><b>Accept:</b> BED 3 label reads “2.85 × 2.85m clear”; register + export show the same number; no room shows an authored stale size.</div>
+    </div></div>
+
+    <div class="phase"><div class="pn"><b>W5</b><span>admin tab</span></div><div class="pb">
+      <h4>The app proves itself</h4>
+      <ul>
+        <li><code>features.ts</code> registry (single source): the §03 matrix rows with human-how, AI-how, example ops, check fn.</li>
+        <li>Backend: <code>POST /api/admin/sandbox</code> (clone seed original → temp review) + <code>DELETE</code>; excluded from the library list.</li>
+        <li><code>#/admin</code> page: matrix table with Human/AI columns, Run all checks, per-row PASS/FAIL + duration + expandable example, localStorage last-run, sidebar badge on failures.</li>
+      </ul>
+      <div class="accept"><b>Accept:</b> Run all checks → every §03 row reports PASS on a clean build; the duplicate-room check fails BEFORE W1 lands and passes after (the tab catches real bugs).</div>
+    </div></div>
+
+    <div class="phase"><div class="pn"><b>W6</b><span>e2e — in scope</span></div><div class="pb">
+      <h4>Same registry, real browser</h4>
+      <ul><li>Playwright spec generated from <code>features.ts</code> driving the actual UI per feature (extends the demo infra); run on demand / CI. In scope now per decision Q3.</li></ul>
+      <div class="accept"><b>Accept:</b> one command runs the browser matrix and writes a report beside the demo artifacts.</div>
+    </div></div>
+  </section>
+
+  <!-- ============ 07 RISKS ============ -->
+  <section>
+    <h2 class="sec"><span class="n">07</span> Risks &amp; guard-rails</h2>
+    <div class="risk"><b>Wall-move ambiguity</b> Moving a shared wall changes two rooms at once; a mis-drag ricochets. Guard: live dim labels on both rooms during the drag, 0.05m snap, min-size clamps, and ⌘Z. Exterior walls are simply immovable (envelope contract).</div>
+    <div class="risk"><b>Pending-op rewrite complexity</b> Multiple edits to one pending object must merge into one op (not stack). Guard: the pending list keys ops by preview id; W5’s parity check (preview == server result) makes drift visible immediately.</div>
+    <div class="risk"><b>Clear dims near openings</b> An opening doesn’t reduce wall thickness for dimensioning — clear size uses the wall face regardless. Stated in the spec so the numbers stay stable when doors are added.</div>
+    <div class="risk"><b>Sandbox hygiene</b> Crashed check runs could leak sandbox reviews. Guard: sandboxes are flagged, hidden from the library, and swept on backend start + before each run.</div>
+    <div class="risk"><b>Matrix drift</b> New canvas features that skip the registry silently escape testing. Guard: PR convention — any change under <code>PlanCanvas/Inspector/editing.ts</code> must touch <code>features.ts</code>; the Feature Checks tab shows a “features without checks” count.</div>
+  </section>
+
+  <!-- ============ 08 DECISIONS ============ -->
+  <section>
+    <h2 class="sec"><span class="n">08</span> Decisions — locked 2026-07-13 <small>all four answered via this review; the plan reflects them</small></h2>
+    <div class="card">
+      <div class="tbl-scroll"><table class="list">
+        <thead><tr><th></th><th>Question</th><th>Decision</th><th>Consequence</th></tr></thead>
+        <tbody>
+          <tr><td><b>Q1</b></td><td>Wall drag semantics</td><td><b>The shared wall moves</b> — one neighbour grows, the other shrinks</td><td>W2 emits two resize_room ops per drag; footprint conserved by construction; exterior walls refuse.</td></tr>
+          <tr><td><b>Q2</b></td><td>Canvas dimension labels</td><td><b>Clear size only</b> on canvas; inspector keeps rect fields + a clear readout</td><td>W4 retires authored dims strings; register/export/areas all switch to clear numbers.</td></tr>
+          <tr><td><b>Q3</b></td><td>Self-test scope</td><td><b>Both now</b> — Feature Checks tab + Playwright e2e matrix in the same pass</td><td>W5 and W6 both in scope; the same features.ts registry feeds both.</td></tr>
+          <tr><td><b>Q4</b></td><td>Rename interaction</td><td><b>Inspector-only with autofocus</b> — selecting a room focuses the Name field</td><td>W3 autofocuses + selects Name/Label on selection (incl. newly created objects); no inline canvas input.</td></tr>
+          <tr><td><b>+</b></td><td>Tab name</td><td><b>“Feature Checks”</b> (annotation)</td><td>Sidebar item, page heading, and this PRD all renamed.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <footer>
+    Plan-canvas parity PRD · findings verified live on v03 head (no versions created) · design system:
+    the app’s own Drafting Ink · annotate any row or queue the decisions, then press <b>Send to Agent</b>.
+  </footer>
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "strict",
+    themeVariables: { fontFamily: "'Helvetica Neue', Arial, sans-serif",
+      primaryColor: "#f4f4f5", primaryBorderColor: "#141416", primaryTextColor: "#141416",
+      lineColor: "#141416", clusterBkg: "#ffffff", clusterBorder: "#141416" } });
+  window.addEventListener("load", () => mermaid.run({ nodes: document.querySelectorAll(".mermaid") }));
+</script>

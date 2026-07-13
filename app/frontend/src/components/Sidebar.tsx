@@ -38,6 +38,9 @@ export default function Sidebar({ plans, route, backendOk, busy, open, onNavigat
       <button className={`item${route.page === 'upload' ? ' active' : ''}`} onClick={() => go('#/upload')}>
         <span>Upload plan</span>
       </button>
+      <button className={`item${route.page === 'admin' ? ' active' : ''}`} onClick={() => go('#/admin')}>
+        <span>Feature Checks</span>
+      </button>
       <div className="group">Recent reviews</div>
       {plans.length === 0 && <div className="empty">No plans yet.</div>}
       {plans.map((p) => {
