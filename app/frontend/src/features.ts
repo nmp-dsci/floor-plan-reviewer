@@ -131,7 +131,7 @@ export const FEATURES: FeatureDef[] = [
     group: 'Rooms',
     feature: 'Add room',
     human: '+ Room → drag out the space → name it (field auto-focused)',
-    ai: 'add_room (incl. from a region target)',
+    ai: 'add_room',
     example: 'butlers pantry 1.5×2.0m in free space',
     check: async (ctx) => {
       // find free space: use the envelope edge next to the smallest room... simplest:
@@ -457,15 +457,6 @@ export const FEATURES: FeatureDef[] = [
     kind: 'op',
   },
   // ---------- space, batch & versions ----------
-  {
-    id: 'region-target',
-    group: 'Space, batch & versions',
-    feature: 'Target empty space',
-    human: '+ Room drag → name it yourself or send the region to the agent',
-    ai: 'Region rect in comment targets → add_room',
-    example: 'space 2.0×2.5m → “build a butlers pantry here”',
-    kind: 'gesture',
-  },
   {
     id: 'batch-apply',
     group: 'Space, batch & versions',

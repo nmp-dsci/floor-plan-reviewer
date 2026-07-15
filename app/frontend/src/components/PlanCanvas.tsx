@@ -110,7 +110,7 @@ export default function PlanCanvas({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onSelectionChange({ rooms: [], walls: [], fixtures: [], openings: [], region: null });
+        onSelectionChange({ rooms: [], walls: [], fixtures: [], openings: [] });
         setMulti(false);
         setDraw(null);
       }
@@ -126,7 +126,6 @@ export default function PlanCanvas({
       if (additive || multi) {
         onSelectionChange({
           ...selection,
-          region: null,
           rooms: has ? selection.rooms.filter((r) => r !== id) : [...selection.rooms, id],
         });
       } else {
@@ -134,9 +133,7 @@ export default function PlanCanvas({
           rooms: has && selection.rooms.length === 1 ? [] : [id],
           walls: [],
           fixtures: [],
-          openings: [],
-          region: null,
-        });
+          openings: [],        });
       }
     },
     [interactive, multi, onSelectionChange, selection],
@@ -149,7 +146,6 @@ export default function PlanCanvas({
       if (additive || multi) {
         onSelectionChange({
           ...selection,
-          region: null,
           fixtures: has ? selection.fixtures.filter((f) => f !== id) : [...selection.fixtures, id],
         });
       } else {
@@ -157,9 +153,7 @@ export default function PlanCanvas({
           rooms: [],
           walls: [],
           fixtures: has && selection.fixtures.length === 1 ? [] : [id],
-          openings: [],
-          region: null,
-        });
+          openings: [],        });
       }
     },
     [interactive, multi, onSelectionChange, selection],
@@ -176,7 +170,6 @@ export default function PlanCanvas({
       if (additive || multi) {
         onSelectionChange({
           ...selection,
-          region: null,
           walls: has
             ? selection.walls.filter((w) => w.id !== wall.id)
             : [...selection.walls, entry],
@@ -186,9 +179,7 @@ export default function PlanCanvas({
           rooms: [],
           walls: has && selection.walls.length === 1 && selection.walls[0].whole === whole ? [] : [entry],
           fixtures: [],
-          openings: [],
-          region: null,
-        });
+          openings: [],        });
       }
     },
     [interactive, multi, onSelectionChange, selection],
@@ -203,7 +194,6 @@ export default function PlanCanvas({
         walls: [],
         fixtures: [],
         openings: has ? [] : [{ id: openingId, wallId }],
-        region: null,
       });
     },
     [interactive, onSelectionChange, selection.openings],
@@ -305,7 +295,7 @@ export default function PlanCanvas({
 
   const backgroundClick = () => {
     if (!interactive || draw) return;
-    onSelectionChange({ rooms: [], walls: [], fixtures: [], openings: [], region: null });
+    onSelectionChange({ rooms: [], walls: [], fixtures: [], openings: [] });
     setMulti(false);
   };
 
@@ -834,35 +824,6 @@ export default function PlanCanvas({
             />
           );
         })}
-
-        {/* selected space (region) → becomes a new room or an agent target */}
-        {selection.region && (
-          <g pointerEvents="none">
-            <rect
-              x={X(selection.region.x)}
-              y={Y(selection.region.y)}
-              width={px(selection.region.w)}
-              height={px(selection.region.h)}
-              fill="rgba(226,61,40,0.08)"
-              stroke={RED}
-              strokeWidth={2.5}
-              strokeDasharray="7 4"
-            />
-            <text
-              x={X(selection.region.x + selection.region.w / 2)}
-              y={Y(selection.region.y + selection.region.h / 2)}
-              fontSize={11}
-              fontWeight={700}
-              textAnchor="middle"
-              fill={RED}
-              stroke="#fff"
-              strokeWidth={3}
-              paintOrder="stroke"
-            >
-              NEW ROOM · {selection.region.w.toFixed(1)}×{selection.region.h.toFixed(1)}m
-            </text>
-          </g>
-        )}
 
         {/* draw previews */}
         {draw && tool !== 'add-wall' && (

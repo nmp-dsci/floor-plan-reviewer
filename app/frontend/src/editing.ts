@@ -265,48 +265,78 @@ export function applyOpsPreview(geo: PlanGeometry, entries: PendingEntry[]): Pla
         break;
     }
   }
-  // re-derive walls so wall moves / new rooms show in the preview. Existing openings are
-  // re-homed by ABSOLUTE POSITION (like the server), not carried by wall id — a swap or
-  // other topology-changing edit renames walls, and carry-by-id would silently drop the
-  // door even though the server keeps it, making the amber preview lie about the commit.
+  // Openings mirror plan_core.ops.apply_ops. When a room op changes geometry the walls are
+  // re-derived, so existing openings are re-homed by ABSOLUTE POSITION (like the server), not
+  // carried by wall id — a swap or other topology-changing edit renames walls, and carry-by-id
+  // would silently drop the door even though the server keeps it. A modify_opening resolves its
+  // t0/t1 against the ORIGINAL host wall (before re-derivation) exactly like the server's
+  // geo.opening(), so a room op that resizes that host wall in the same batch can't shift it.
   if (entries.some((e) => ROOM_GEOMETRY_OPS.has(e.op.op))) {
     // level per room: original rooms for the snapshot (old walls may host a removed room),
     // mutated rooms for the re-derived walls
     const snapLevel = new Map(geo.rooms.map((r) => [r.id, r.level ?? DEFAULT_LEVEL]));
-    const snapshot = snapshotOpenings(g.walls, snapLevel);
+    let snapshot = snapshotOpenings(g.walls, snapLevel);
+    // modify_opening / remove_opening act on the abs snapshot BEFORE re-derivation — modify
+    // against the ORIGINAL host wall's span, so re-homing lands it where the server commits.
+    for (const { op } of openingEntries) {
+      if (op.op === 'modify_opening') {
+        const a = snapshot.find((s) => s.id === op.opening_id);
+        const host = g.walls.find((w) => w.openings.some((o) => o.id === op.opening_id));
+        if (a && host) {
+          if (op.t0 !== undefined) a.lo = tToAbs(host, op.t0);
+          if (op.t1 !== undefined) a.hi = tToAbs(host, op.t1);
+          if (op.type) a.type = op.type;
+        }
+      } else if (op.op === 'remove_opening') {
+        snapshot = snapshot.filter((s) => s.id !== op.opening_id);
+      }
+    }
     g.walls = deriveWalls(g.rooms);
     const finalLevel = new Map(g.rooms.map((r) => [r.id, r.level ?? DEFAULT_LEVEL]));
     rehomeOpenings(g.walls, snapshot, finalLevel);
-  }
-  // second pass: openings now land on the (re-derived) walls the user actually clicked
-  for (const { pid, op } of openingEntries) {
-    switch (op.op) {
-      case 'add_opening': {
+    // add_opening / remove_wall_chunk resolve against the re-derived walls (their ids are only
+    // correct here — a room move in the same batch renames the wall the user clicked).
+    for (const { pid, op } of openingEntries) {
+      if (op.op === 'add_opening') {
         const w = g.walls.find((w) => w.id === op.wall_id);
         if (w) w.openings.push({ id: pvId(pid), type: op.type, t0: op.t0, t1: op.t1 });
-        break;
-      }
-      case 'remove_wall_chunk': {
+      } else if (op.op === 'remove_wall_chunk') {
         const w = g.walls.find((w) => w.id === op.wall_id);
         if (w) w.openings.push({ id: pvId(pid), type: 'open', t0: op.t0, t1: op.t1 });
-        break;
       }
-      case 'modify_opening': {
-        for (const w of g.walls) {
-          const o = w.openings.find((o) => o.id === op.opening_id);
-          if (o) {
-            if (op.t0 !== undefined) o.t0 = op.t0;
-            if (op.t1 !== undefined) o.t1 = op.t1;
-            if (op.type) o.type = op.type;
+    }
+  } else {
+    // walls unchanged: apply opening ops in place (matches the server — no wall length changes,
+    // so t0/t1 map to the same absolute span the server re-homes onto).
+    for (const { pid, op } of openingEntries) {
+      switch (op.op) {
+        case 'add_opening': {
+          const w = g.walls.find((w) => w.id === op.wall_id);
+          if (w) w.openings.push({ id: pvId(pid), type: op.type, t0: op.t0, t1: op.t1 });
+          break;
+        }
+        case 'remove_wall_chunk': {
+          const w = g.walls.find((w) => w.id === op.wall_id);
+          if (w) w.openings.push({ id: pvId(pid), type: 'open', t0: op.t0, t1: op.t1 });
+          break;
+        }
+        case 'modify_opening': {
+          for (const w of g.walls) {
+            const o = w.openings.find((o) => o.id === op.opening_id);
+            if (o) {
+              if (op.t0 !== undefined) o.t0 = op.t0;
+              if (op.t1 !== undefined) o.t1 = op.t1;
+              if (op.type) o.type = op.type;
+            }
           }
+          break;
         }
-        break;
+        case 'remove_opening':
+          for (const w of g.walls) {
+            w.openings = w.openings.filter((o) => o.id !== op.opening_id);
+          }
+          break;
       }
-      case 'remove_opening':
-        for (const w of g.walls) {
-          w.openings = w.openings.filter((o) => o.id !== op.opening_id);
-        }
-        break;
     }
   }
   return g;
