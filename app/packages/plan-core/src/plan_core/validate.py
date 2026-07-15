@@ -46,7 +46,14 @@ def validate(geo: PlanGeometry) -> tuple[list[str], list[str]]:
     for dup in {i for i in ids if ids.count(i) > 1}:
         errors.append(f"duplicate room id '{dup}'")
 
-    for level_id in geo.level_ids():
+    declared = geo.level_ids()
+    if geo.meta.get("levels"):
+        known = set(declared)
+        for r in geo.rooms:
+            if r.level not in known:
+                errors.append(f"room '{r.id}' has unknown level '{r.level}'")
+
+    for level_id in sorted(set(declared) | {r.level for r in geo.rooms}):
         rooms = geo.rooms_on(level_id)
         if not rooms:
             continue

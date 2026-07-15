@@ -452,6 +452,23 @@ def test_modest_overlap_warns_gross_overlap_errors() -> None:
     assert any("overlap" in e for e in validate(gross)[0])
 
 
+def test_room_on_unknown_level_is_flagged_not_skipped() -> None:
+    from plan_core import PlanGeometry, Room
+
+    # a room tagged with a level missing from meta['levels'] must be rejected AND
+    # still go through the per-level geometry checks, not silently escape them
+    geo = PlanGeometry(
+        rooms=[
+            Room(id="a", name="A", x=0, y=0, w=4, h=4, level="level-1"),
+            Room(id="tiny", name="TINY", x=0, y=0, w=0.5, h=0.5, level="level-9"),
+        ],
+        meta={"levels": [{"id": "level-1"}]},
+    )
+    errors, _ = validate(geo)
+    assert any("room 'tiny' has unknown level 'level-9'" in e for e in errors)
+    assert any("room 'tiny' too small" in e for e in errors)
+
+
 def test_add_room_lands_on_requested_level() -> None:
     geo = convert_v1(_two_level_draft())
     # free strip inside the garage envelope (beside STORAGE), on the garage level

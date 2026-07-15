@@ -531,7 +531,7 @@ function edgeNeighbours(geo: PlanGeometry, room: Room): EdgeNeighbours {
   const rx2 = room.x + room.w;
   const ry2 = room.y + room.h;
   const cells = geo.rooms.filter(
-    (r) => r.z === 0 && r.id !== room.id && (r.level ?? 'level-1') === level,
+    (r) => r.z === 0 && r.id !== room.id && !isPendingId(r.id) && (r.level ?? 'level-1') === level,
   );
   const xOverlap = (n: Room) => Math.min(n.x + n.w, rx2) - Math.max(n.x, room.x);
   const yOverlap = (n: Room) => Math.min(n.y + n.h, ry2) - Math.max(n.y, room.y);

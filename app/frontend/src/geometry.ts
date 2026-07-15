@@ -254,24 +254,17 @@ function deriveWallsOneLevel(rooms: Room[]): Wall[] {
   return walls;
 }
 
-/** Re-derive walls from room rectangles (per level), preserving each wall's openings
- * by id where the same wall still exists. Mirrors plan_core.walls.derive_walls. */
-export function deriveWalls(rooms: Room[], prev: Wall[] = []): Wall[] {
+/** Re-derive walls from room rectangles (per level). Openings are re-homed by
+ * absolute position via rehomeOpenings. Mirrors plan_core.walls.derive_walls. */
+export function deriveWalls(rooms: Room[]): Wall[] {
   const levels: string[] = [];
   for (const r of rooms) {
     const lv = r.level ?? DEFAULT_LEVEL;
     if (!levels.includes(lv)) levels.push(lv);
   }
-  const walls =
-    levels.length <= 1
-      ? deriveWallsOneLevel(rooms)
-      : levels.flatMap((lv) => deriveWallsOneLevel(rooms.filter((r) => (r.level ?? DEFAULT_LEVEL) === lv)));
-  const openingsById = new Map(prev.map((w) => [w.id, w.openings]));
-  for (const w of walls) {
-    const carried = openingsById.get(w.id);
-    if (carried) w.openings = carried.map((o) => ({ ...o }));
-  }
-  return walls;
+  return levels.length <= 1
+    ? deriveWallsOneLevel(rooms)
+    : levels.flatMap((lv) => deriveWallsOneLevel(rooms.filter((r) => (r.level ?? DEFAULT_LEVEL) === lv)));
 }
 
 /** Find the wall best matching an absolute span; returns {wall, t0, t1}. Mirrors
