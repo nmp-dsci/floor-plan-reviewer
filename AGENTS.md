@@ -37,7 +37,9 @@ to Bed 1; new entry) — it defines the visual style the renderer reproduces, an
 ## Core invariants — never break these
 
 1. **Envelope is immutable.** Never alter the land boundary, external building envelope, or
-   roofline unless `scope.md` for that property explicitly stipulates it.
+   roofline unless `scope.md` for that property explicitly stipulates it. For multi-level plans in
+   the Studio app this is enforced **per level** — each storey/structure has its own pinned
+   footprint that can neither grow nor shrink.
 2. **Scope is a contract.** Never propose a change type outside the locked `scope.md`. Widening
    scope requires the user to re-confirm `scope.md` (record the change in its changelog).
 3. **`original.png` is never modified.** All renders are new files.
@@ -293,14 +295,40 @@ the skill [`.claude/skills/frontend-style/SKILL.md`](./.claude/skills/frontend-s
 - No shadows, border-radius, or gradients anywhere.
 - Canvas semantics are LOCKED: ink walls, red selection, green/red/amber delta — never restyled.
 
+## Multi-level plans (Studio app, schema v2)
+
+A single listing image can hold several distinct plan blocks — multiple storeys and/or a **detached
+structure** (garage, studio, carport) drawn off to one side. The Studio app models each block as a
+**level**; a plain single-building plan is just one level (tabs hidden, behaviour unchanged).
+
+- **Geometry**: every `Room` and `Fixture` carries a `level` id. Each level has its **own local
+  coordinate origin** (top-left ≈ 0,0) — levels never share or connect coordinates. `PlanGeometry`
+  helpers: `levels()` / `level_ids()` / `rooms_on(id)` / `envelope_for(id)`. `meta["levels"]` holds
+  the ordered `[{id, name}]`; `meta["envelopes"]` holds the pinned per-level footprint. The legacy
+  single `meta["envelope"]` is retained for back-compat (single-level plans).
+- **Validation, walls, footprint** all run **per level** — an overlap or envelope breach on the
+  garage is never measured against the house, and `derive_walls` never bridges two levels.
+- **Vision ingest** (`plan-agent`) segments the image into levels; each room is tagged with its
+  level, each level laid out in its own origin.
+- **Load robustness**: `convert` heals sliver overlaps (vision rounding); the validator downgrades
+  modest overlaps to **warnings** (only gross, genuinely-stacked overlaps error), so a dense plan
+  is approvable instead of dead-ended.
+- **UI**: a level tab strip (`components/LevelTabs.tsx`) sits above the canvas in Review + Ingest;
+  the active level filters the geometry via `levelGeometry(geo, id)`. New rooms/fixtures land on the
+  active level.
+
 ## Roadmap (later phases — not v1)
 
 1. Renderer unit tests + `jsonschema` validation of `changes_v##.json`.
-2. Multi-storey support (several plan images per property).
+2. ~~Multi-storey support~~ **Delivered in the Studio app** (2026-07-15): the geometry model
+   carries **levels** — storeys *and* detached structures (e.g. a detached garage). See
+   "Multi-level plans" below. (The docs-as-agent renderer scripts remain single-image for now.)
 3. Dual-occupancy module (second kitchen + separate entry) as an opt-in scope stipulation.
 4. Optional cost/ROI overlay (decision J revisited) and budget caps.
 5. Styled-plan renderer polish: door swing arcs, window breaks, compass, site-plan panel.
 6. **Floor-Plan Studio web app** — plan APPROVED 2026-07-12, spec in
    [`ai_specs/s01_floorplan-studio-plan.md`](./ai_specs/s01_floorplan-studio-plan.md): `app/`
-   subfolder, React + d3 SVG canvas, FastAPI + Pydantic AI (pluggable LLM — DeepSeek default,
-   Claude for vision), Postgres, phases P0–P6 ending in AWS App Runner like data-qa-agent.
+   subfolder, React + d3 SVG canvas, FastAPI + the Claude Agent SDK — all LLM calls (ops, comps,
+   vision) run on the operator's Claude subscription via `CLAUDE_CODE_OAUTH_TOKEN` (revised from
+   the original "pluggable LLM — DeepSeek default, Claude for vision" plan) — Postgres, phases
+   P0–P6 ending in AWS App Runner like data-qa-agent.

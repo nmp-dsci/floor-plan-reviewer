@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { api } from '../api';
+import LevelTabs from '../components/LevelTabs';
 import PlanCanvas from '../components/PlanCanvas';
+import { levelGeometry, planLevels } from '../geometry';
 import type { PlanGeometry } from '../types';
 import { emptySelection } from '../types';
 
@@ -15,6 +17,7 @@ export default function Ingest({ planId }: { planId: string }) {
   const [baseline, setBaseline] = useState('900');
   const [error, setError] = useState('');
   const [approving, setApproving] = useState(false);
+  const [activeLevel, setActiveLevel] = useState('');
 
   const run = async () => {
     setRunning(true);
@@ -79,13 +82,24 @@ export default function Ingest({ planId }: { planId: string }) {
                 <figcaption>Uploaded image</figcaption>
               </figure>
               <figure>
-                <PlanCanvas
-                  geometry={draft.geometry}
-                  mode="proposed"
-                  selection={emptySelection()}
-                  onSelectionChange={() => undefined}
-                  interactive={false}
-                />
+                {(() => {
+                  const levels = planLevels(draft.geometry);
+                  const active = levels.some((l) => l.id === activeLevel)
+                    ? activeLevel
+                    : (levels[0]?.id ?? 'level-1');
+                  return (
+                    <>
+                      <LevelTabs geometry={draft.geometry} active={active} onChange={setActiveLevel} />
+                      <PlanCanvas
+                        geometry={levelGeometry(draft.geometry, active)}
+                        mode="proposed"
+                        selection={emptySelection()}
+                        onSelectionChange={() => undefined}
+                        interactive={false}
+                      />
+                    </>
+                  );
+                })()}
                 <figcaption>Extracted geometry</figcaption>
               </figure>
             </div>

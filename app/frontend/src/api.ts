@@ -31,11 +31,11 @@ export const api = {
         comments: comments.map((c) => ({ text: c.text, targets: c.targets })),
       }),
     }),
-  applyEdits: (id: string, versionN: number, ops: Op[], title: string) =>
+  applyEdits: (id: string, versionN: number, ops: Op[], title: string, level = '') =>
     json<{ n: number; warnings: string[] }>(`/api/reviews/${id}/edits`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ version_n: versionN, ops, title }),
+      body: JSON.stringify({ version_n: versionN, ops, title, level }),
     }),
   registers: (id: string) =>
     json<{ n: number; register: RegisterHunk[] }[]>(`/api/reviews/${id}/registers`),

@@ -64,16 +64,16 @@ The chat workflow above is also a local-first web app (`app/` — phases P0–P5
 [`ai_specs/s01_floorplan-studio-plan.md`](./ai_specs/s01_floorplan-studio-plan.md)):
 
 ```bash
-cp app/.env.example app/.env    # add DEEPSEEK_API_KEY (+ ANTHROPIC_API_KEY for vision ingest)
+cp app/.env.example app/.env    # add CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token` — runs on your Claude subscription)
 make -C app up                  # docker compose: frontend + backend-api + plan-agent + Postgres
 open http://localhost:5175
 ```
 
 - The plan is a **shape object**: every room and wall is a selectable SVG node (d3). Click a room,
   click a wall (drag the handles to pick a chunk), long-press or shift-click to multi-select.
-- Comments queue into a change list; **Send** hands them to a Pydantic AI agent (DeepSeek by
-  default, per spec D5) that edits geometry only through typed, validated operations — the
-  envelope is unbreakable.
+- Comments queue into a change list; **Send** hands them to a Claude Agent SDK agent (running on
+  your Claude subscription, per spec D5) that edits geometry only through typed, validated
+  operations — the envelope is unbreakable.
 - Every version shows a **computed delta view** (green added / red removed / amber modified) and a
   **git-style change register** generated from the geometry diff, with rent impact and NSW
   advisory flags per hunk.
@@ -109,7 +109,7 @@ examples/                  # style references (e.g. floorplan-styling.webp)
 
 Early scaffold: workflow docs + renderer are in place; first end-to-end run on
 `231-peats-ferry-rd` is next. Later: renderer tests, multi-storey plans, dual-occupancy module,
-cost/ROI overlay, SVG redraws, and graduating the workflow into a standalone Pydantic AI app.
+cost/ROI overlay, SVG redraws, and graduating the workflow into a standalone Agent SDK app.
 
 ---
 

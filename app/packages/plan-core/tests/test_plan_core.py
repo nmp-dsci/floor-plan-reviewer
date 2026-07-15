@@ -123,6 +123,41 @@ def test_wall_chunk_and_openings(v03) -> None:
     assert any(line.obj == "opening" and line.op == "add" for line in lines)
 
 
+def test_add_opening_after_room_move_lands_on_new_wall(v03) -> None:
+    # swap ensuite <-> walk-in-robe (a room move renames the walls), then add a door on a
+    # wall that only exists AFTER the move — it must still land (regression: deferred openings)
+    e = v03.room("ensuite")
+    w = v03.room("walk-in-robe")
+    swap = parse_ops(
+        [
+            {"op": "resize_room", "room_id": "ensuite", "x": e.x, "y": w.y, "w": e.w, "h": e.h},
+            {
+                "op": "resize_room",
+                "room_id": "walk-in-robe",
+                "x": w.x,
+                "y": w.y + e.h,
+                "w": w.w,
+                "h": w.h,
+            },
+        ]
+    )
+    post = apply_ops(v03, swap).geometry
+    new_walls = {wl.id for wl in post.walls} - {wl.id for wl in v03.walls}
+    target = next(wid for wid in new_walls if "ensuite" in wid)
+    assert not any(wl.id == target for wl in v03.walls)  # not present before the move
+    batch = apply_ops(
+        v03,
+        swap
+        + parse_ops(
+            [{"op": "add_opening", "wall_id": target, "t0": 0.4, "t1": 0.6, "type": "door"}]
+        ),
+    )
+    placed = next(wl for wl in batch.geometry.walls if wl.id == target)
+    assert any(o.type == "door" for o in placed.openings), (target, placed.openings)
+    assert not any("not found" in x for x in batch.warnings)
+    assert validate(batch.geometry)[0] == []
+
+
 def test_compliance_flags(v03) -> None:
     ops = parse_ops(
         [
@@ -267,6 +302,111 @@ def test_clear_dimensions(v03) -> None:
     cw, ch = clear_size(bed3, geo.walls)
     assert abs(cw - 2.85) < 0.02 and abs(ch - 2.92) < 0.02, (cw, ch)
     assert clear_dims_label(bed3, geo.walls).endswith("m")
+
+
+def _two_level_draft() -> dict:
+    """A house + a detached garage, each drawn in its OWN local origin (both near 0,0)."""
+    return {
+        "address": "9 Test St",
+        "levels": [{"id": "level-1", "name": "Level 1"}, {"id": "garage", "name": "Garage"}],
+        "rooms": [
+            {"name": "LOUNGE", "x": 0, "y": 0, "w": 4, "h": 4, "level": "level-1"},
+            {"name": "BED 1", "x": 4.1, "y": 0, "w": 3.5, "h": 4, "level": "level-1"},
+            {"name": "BATH", "x": 0, "y": 4.1, "w": 3, "h": 2.5, "level": "level-1"},
+            # garage block: coords deliberately overlap the house's coordinate range
+            {"name": "GARAGE", "x": 0, "y": 0, "w": 6, "h": 6, "fill": "grey", "level": "garage"},
+            {
+                "name": "STORAGE",
+                "x": 0,
+                "y": 6.1,
+                "w": 5,
+                "h": 2,
+                "fill": "grey",
+                "level": "garage",
+            },
+        ],
+    }
+
+
+def test_multilevel_convert_isolates_levels() -> None:
+    geo = convert_v1(_two_level_draft())
+    assert [lvl["id"] for lvl in geo.levels()] == ["level-1", "garage"]
+    assert set(geo.meta["envelopes"]) == {"level-1", "garage"}
+    # every room carries its level; walls never bridge two levels
+    house = {r.id for r in geo.rooms_on("level-1")}
+    gar = {r.id for r in geo.rooms_on("garage")}
+    assert house and gar
+    for w in geo.walls:
+        assert not ({w.a, w.b} & house and {w.a, w.b} & gar), (w.a, w.b)
+    # overlapping coordinate ranges on different levels must NOT flag as overlaps
+    errors, _ = validate(geo)
+    assert errors == [], errors
+    # footprint is summed per level (both structures counted), not one shared bbox
+    per_level = sum(
+        (e[2] - e[0]) * (e[3] - e[1]) for e in (geo.envelope_for(lid) for lid in geo.level_ids())
+    )
+    assert abs(geo.total_area() - per_level) < 1e-6
+    assert geo.total_area() > 90
+
+
+def test_convert_heals_sliver_overlaps() -> None:
+    # two rooms drawn 0.1 m into each other — a vision rounding artefact, not a real clash
+    draft = {
+        "rooms": [
+            {"name": "A", "x": 0, "y": 0, "w": 4, "h": 4},
+            {"name": "B", "x": 3.9, "y": 0, "w": 4, "h": 4},
+        ]
+    }
+    geo = convert_v1(draft)
+    errors, _ = validate(geo)
+    assert not any("overlap" in e for e in errors), errors
+
+
+def test_modest_overlap_warns_gross_overlap_errors() -> None:
+    from plan_core import PlanGeometry, Room
+
+    # 0.5 m penetration (below GROSS) → warning, never a blocking error
+    modest = PlanGeometry(
+        rooms=[
+            Room(id="a", name="A", x=0, y=0, w=4, h=4),
+            Room(id="b", name="B", x=3.5, y=0, w=4, h=4),
+        ],
+    )
+    errors, warnings = validate(modest)
+    assert not any("overlap" in e for e in errors)
+    assert any("overlap" in w for w in warnings)
+    # rooms genuinely stacked (2 m penetration) → error
+    gross = PlanGeometry(
+        rooms=[
+            Room(id="a", name="A", x=0, y=0, w=4, h=4),
+            Room(id="b", name="B", x=2, y=0, w=4, h=4),
+        ],
+    )
+    assert any("overlap" in e for e in validate(gross)[0])
+
+
+def test_add_room_lands_on_requested_level() -> None:
+    geo = convert_v1(_two_level_draft())
+    # free strip inside the garage envelope (beside STORAGE), on the garage level
+    result = apply_ops(
+        geo,
+        parse_ops(
+            [
+                {
+                    "op": "add_room",
+                    "name": "WORKSHOP",
+                    "x": 5.05,
+                    "y": 6.1,
+                    "w": 0.9,
+                    "h": 1.9,
+                    "level": "garage",
+                }
+            ]
+        ),
+    )
+    made = next(r for r in result.geometry.rooms if "workshop" in r.id)
+    assert made.level == "garage"
+    assert validate(result.geometry)[0] == []
 
 
 def test_change_author_defaults_to_agent_and_lands_in_hunk(v03) -> None:

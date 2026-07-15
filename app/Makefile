@@ -16,6 +16,7 @@ logs:
 
 test:
 	cd packages/plan-core && uv run pytest -q
+	cd services/plan-agent && uv run pytest -q
 
 smoke:
 	@curl -sf http://localhost:8090/api/health >/dev/null && echo "backend  OK"

@@ -6,9 +6,10 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from plan_agent.agent import AGENT_MODE, MODEL, run_ops_agent
+from plan_agent.agent import run_ops_agent
 from plan_agent.comps import run_comps
-from plan_agent.ingest import VISION_MODEL, run_ingest
+from plan_agent.ingest import run_ingest
+from plan_agent.llm import AGENT_MODE, MODEL, VISION_MODEL, auth_configured
 
 logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="floor-plan-studio plan-agent")
@@ -16,7 +17,13 @@ app = FastAPI(title="floor-plan-studio plan-agent")
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "mode": AGENT_MODE, "model": MODEL, "vision_model": VISION_MODEL}
+    return {
+        "ok": True,
+        "mode": AGENT_MODE,
+        "model": MODEL,
+        "vision_model": VISION_MODEL,
+        "auth": auth_configured(),
+    }
 
 
 class ApplyIn(BaseModel):

@@ -3,8 +3,10 @@ import { api, subscribe } from '../api';
 import ChangeList from '../components/ChangeList';
 import ContextBar from '../components/ContextBar';
 import Inspector from '../components/Inspector';
+import LevelTabs from '../components/LevelTabs';
 import PlanCanvas from '../components/PlanCanvas';
 import Register from '../components/Register';
+import { envelopeForLevel, levelGeometry, planLevels } from '../geometry';
 import type { Op, PendingEntry } from '../editing';
 import {
   applyOpsPreview,
@@ -53,6 +55,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
   const [original, setOriginal] = useState<PlanGeometry | null>(null);
   const [registers, setRegisters] = useState<Map<number, RegisterHunk[]>>(new Map());
   const [mode, setMode] = useState<'proposed' | 'delta'>('proposed');
+  const [activeLevel, setActiveLevel] = useState<string>('');
   const [selection, setSelection] = useState<Selection>(emptySelection());
   const [tool, setTool] = useState<Tool>('select');
   const [pending, setPending] = useState<PendingEntry[]>([]);
@@ -235,7 +238,9 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
 
       if (mod && key === 'v' && clipboard) {
         e.preventDefault();
-        const env = (detail.geometry.meta.envelope as [number, number, number, number]) ?? [0, 0, 99, 99];
+        const lvls = planLevels(detail.geometry);
+        const lv = lvls.some((l) => l.id === activeLevel) ? activeLevel : (lvls[0]?.id ?? 'level-1');
+        const env = envelopeForLevel(detail.geometry, lv);
         if (clipboard.kind === 'room') {
           const r = clipboard.data;
           const at = placeCopy(r, env);
@@ -269,7 +274,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, currentN, review, detail, clipboard, pending, busy, reviewId, loadReview, onVersionAdded]);
+  }, [selection, currentN, review, detail, clipboard, pending, busy, reviewId, loadReview, onVersionAdded, activeLevel]);
 
   if (!review || currentN === null || !detail) {
     return <div className="banner">Loading review…</div>;
@@ -286,7 +291,23 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
   const previewGeo = pending.length > 0 ? applyOpsPreview(detail.geometry, pending) : detail.geometry;
   const pendingMarks = touchedIds(pending);
 
-  function queueOps(ops: Op[]) {
+  // levels: storeys + detached structures. `active` is always a valid level id, so a
+  // single-level plan (tabs hidden) still filters to its sole level transparently.
+  const levels = planLevels(detail.geometry);
+  const active = levels.some((l) => l.id === activeLevel) ? activeLevel : (levels[0]?.id ?? 'level-1');
+  const canvasGeo = levelGeometry(previewGeo, active);
+  const canvasOriginal = original ? levelGeometry(original, active) : null;
+
+  const changeLevel = (levelId: string) => {
+    setActiveLevel(levelId);
+    setSelection(emptySelection());
+  };
+
+  function queueOps(rawOps: Op[]) {
+    // new rooms/fixtures land on the level currently being viewed
+    const ops = rawOps.map((op) =>
+      (op.op === 'add_room' || op.op === 'add_fixture') && !op.level ? { ...op, level: active } : op,
+    );
     const entries = ops.map((op) => ({ pid: newPid(), op }));
     setPending((p) => [...p, ...entries]);
     // auto-select the created object so the inspector opens focused on its name
@@ -325,7 +346,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
     setBusy(true);
     setBanner({ kind: 'busy', text: 'Applying your edits…' });
     api
-      .applyEdits(reviewId, head, ops, describeOps(ops))
+      .applyEdits(reviewId, head, ops, describeOps(ops), active)
       .then((res) => {
         setBusy(false);
         setPending([]);
@@ -411,13 +432,14 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
               <span>Plan canvas</span>
               <small>
                 {atHead
-                  ? 'click to select · drag to move · walls drag sideways · edits batch until you apply'
+                  ? 'click to select · drag a room to reshape neighbours (Alt = free move) · walls drag sideways · edits batch until you apply'
                   : 'read-only — jump to head to edit'}
               </small>
             </h2>
+            <LevelTabs geometry={detail.geometry} active={active} onChange={changeLevel} />
             <PlanCanvas
-              geometry={previewGeo}
-              original={original}
+              geometry={canvasGeo}
+              original={canvasOriginal}
               mode={mode}
               selection={selection}
               onSelectionChange={setSelection}
@@ -427,7 +449,6 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
               onOps={queueOps}
               onRewrite={rewritePending}
               onWallMove={onWallMove}
-              onRegion={(region) => setSelection({ ...emptySelection(), region })}
               pendingIds={pendingMarks}
             />
             {mode === 'delta' && (
@@ -447,7 +468,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
               <small>direct edits — no agent, instant</small>
             </h2>
             <Inspector
-              geometry={previewGeo}
+              geometry={canvasGeo}
               selection={selection}
               pending={pending}
               busy={busy}

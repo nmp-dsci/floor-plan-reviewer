@@ -23,9 +23,10 @@ services:
       - path: .env
         required: false
     environment:
-      PLAN_AGENT_MODEL: ${PLAN_AGENT_MODEL:-deepseek:deepseek-chat}
-      VISION_MODEL: ${VISION_MODEL:-anthropic:claude-opus-4-8}
+      PLAN_AGENT_MODEL: ${PLAN_AGENT_MODEL:-claude-opus-4-8}
+      VISION_MODEL: ${VISION_MODEL:-claude-opus-4-8}
       AGENT_MODE: ${AGENT_MODE:-llm}
+      # CLAUDE_CODE_OAUTH_TOKEN flows in via env_file: .env (do NOT set ANTHROPIC_API_KEY)
     ports:
       - "8091:8091"
     healthcheck:

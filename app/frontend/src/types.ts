@@ -9,6 +9,12 @@ export interface Room {
   h: number;
   fill: 'white' | 'grey';
   z: number;
+  level: string;
+}
+
+export interface PlanLevel {
+  id: string;
+  name: string;
 }
 
 export type OpeningType = 'door' | 'window' | 'open';
@@ -36,6 +42,7 @@ export interface Fixture {
   w: number;
   h: number;
   label: string;
+  level: string;
 }
 
 export interface PlanGeometry {

@@ -287,9 +287,11 @@ async def _run_job(job_id: str, review_id: str, batch: CommentBatch) -> None:
         payload = resp.json()
 
         new_geo = PlanGeometry(**payload["geometry"])
-        new_geo.meta["envelope"] = PlanGeometry(**original.geometry).meta.get(
-            "envelope", new_geo.meta.get("envelope")
-        )
+        orig_meta = PlanGeometry(**original.geometry).meta
+        # the pinned footprint (per level) is immutable — always carry it from the original
+        new_geo.meta["envelope"] = orig_meta.get("envelope", new_geo.meta.get("envelope"))
+        new_geo.meta["envelopes"] = orig_meta.get("envelopes", new_geo.meta.get("envelopes"))
+        new_geo.meta["levels"] = orig_meta.get("levels", new_geo.meta.get("levels"))
         errors, warnings = validate(new_geo)
         if errors:
             raise RuntimeError("agent produced invalid geometry: " + "; ".join(errors[:4]))
@@ -365,12 +367,17 @@ class EditBatch(BaseModel):
     version_n: int
     ops: list[dict[str, Any]]
     title: str = ""
+    level: str = ""  # active level; new rooms/fixtures inherit it when the op omits one
 
 
 @app.post("/api/reviews/{review_id}/edits", status_code=201)
 def apply_edits(review_id: str, batch: EditBatch) -> dict[str, Any]:
     """Human edits: the same pipeline as the agent (apply_ops → validate → version),
     minus the LLM. Rent is carried unchanged and flagged for re-assessment."""
+    if batch.level:  # place new objects on the level the user is viewing
+        for raw in batch.ops:
+            if raw.get("op") in ("add_room", "add_fixture") and not raw.get("level"):
+                raw["level"] = batch.level
     try:
         ops = parse_ops(batch.ops)
     except Exception as exc:  # noqa: BLE001 — surface schema errors as 422
@@ -394,9 +401,10 @@ def apply_edits(review_id: str, batch: EditBatch) -> dict[str, Any]:
         head_geo = _geo(head)
         result = apply_ops(head_geo, ops)
         new_geo = result.geometry
-        new_geo.meta["envelope"] = _geo(versions[0]).meta.get(
-            "envelope", new_geo.meta.get("envelope")
-        )
+        orig_meta = _geo(versions[0]).meta
+        new_geo.meta["envelope"] = orig_meta.get("envelope", new_geo.meta.get("envelope"))
+        new_geo.meta["envelopes"] = orig_meta.get("envelopes", new_geo.meta.get("envelopes"))
+        new_geo.meta["levels"] = orig_meta.get("levels", new_geo.meta.get("levels"))
         errors, warnings = validate(new_geo)
         if errors:
             raise HTTPException(422, "; ".join(errors[:5]))
@@ -688,7 +696,10 @@ class ApproveIn(BaseModel):
 @app.post("/api/plans/{plan_id}/approve", status_code=201)
 def approve_plan(plan_id: str, body: ApproveIn) -> dict[str, str]:
     geo = PlanGeometry(**body.geometry)
+    # pin the immutable footprint per level (each structure/storey has its own origin)
     geo.meta["envelope"] = list(geo.envelope())
+    geo.meta["envelopes"] = {lid: list(geo.envelope_for(lid)) for lid in geo.level_ids()}
+    geo.meta["levels"] = geo.levels()
     errors, _ = validate(geo)
     if errors:
         raise HTTPException(422, "; ".join(errors[:5]))

@@ -135,6 +135,18 @@ h1 { margin: 6px 0 2px; font-size: 24px; letter-spacing: 0.06em; text-transform:
 .card > h2 small { color: var(--faint); letter-spacing: 0.04em; font-weight: 400; text-transform: none; }
 .card .body { padding: 12px; }
 
+/* level tabs: storeys + detached structures (e.g. Level 1 / Garage) above the canvas */
+.level-tabs { display: flex; flex-wrap: wrap; padding: 8px 12px; border-bottom: 3px solid var(--ink); }
+.level-tabs button {
+  border: 2px solid var(--ink); background: var(--paper); color: var(--ink);
+  font: inherit; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+  padding: 5px 12px; margin-left: -2px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+}
+.level-tabs button:first-child { margin-left: 0; }
+.level-tabs button.active { background: var(--ink); color: var(--paper); }
+.level-tabs button .n { font-size: 10px; color: var(--faint); font-weight: 400; }
+.level-tabs button.active .n { color: var(--grey); }
+
 .canvas-wrap { position: relative; }
 .canvas-wrap svg { display: block; width: 100%; height: auto; background: var(--paper); touch-action: none; }
 .room-hit { cursor: pointer; }

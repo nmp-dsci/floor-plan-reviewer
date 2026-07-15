@@ -9,18 +9,15 @@ validated here; validator errors are fed back for up to 2 retries.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from plan_core import Op, PlanGeometry, apply_ops, parse_ops, validate
 from plan_core.compliance import flags_for
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent
+
+from plan_agent.llm import AGENT_MODE, MODEL, parse_structured
 
 log = logging.getLogger("plan-agent")
-
-MODEL = os.environ.get("PLAN_AGENT_MODEL", "deepseek:deepseek-chat")
-AGENT_MODE = os.environ.get("AGENT_MODE", "llm")  # llm | echo
 
 
 class ProposedChange(BaseModel):
@@ -61,12 +58,21 @@ comment using ONLY the typed operations available. Rules:
 
 
 def _describe_geometry(geo: PlanGeometry) -> str:
-    lines = ["ROOMS (id · name · kind · rect x,y,w,h in m):"]
+    multi = len(geo.level_ids()) > 1
+    lines: list[str] = []
+    if multi:
+        names = ", ".join(f"{lvl['id']} ({lvl['name']})" for lvl in geo.levels())
+        lines.append(
+            f"LEVELS (separate storeys/structures, each own origin): {names}. "
+            "Set `level` on add_room/add_fixture to the level you are editing."
+        )
+    lines.append("ROOMS (id · name · kind · rect x,y,w,h in m):")
     for r in geo.rooms:
         nested = " (nested)" if r.z else ""
+        lvl = f" · level={r.level}" if multi else ""
         lines.append(
             f"- {r.id} · {r.name} · {r.kind} · ({r.x:.2f},{r.y:.2f},{r.w:.2f},{r.h:.2f})"
-            f" · fill={r.fill}{nested}"
+            f" · fill={r.fill}{nested}{lvl}"
         )
     lines.append("\nWALLS (id · between · length · openings):")
     for w in geo.walls:
@@ -95,16 +101,6 @@ def _describe_comments(comments: list[dict[str, Any]]) -> str:
                 parts.append(f"{t['type']}:{t['id']}")
         lines.append(f'{i}. "{c["text"]}"  [targets: {", ".join(parts) or "whole plan"}]')
     return "\n".join(lines)
-
-
-_agent: Agent[None, OpsPlan] | None = None
-
-
-def get_agent() -> Agent[None, OpsPlan]:
-    global _agent
-    if _agent is None:
-        _agent = Agent(MODEL, output_type=OpsPlan, instructions=SYSTEM, retries=2)
-    return _agent
 
 
 def _echo_plan(comments: list[dict[str, Any]]) -> OpsPlan:
@@ -138,12 +134,12 @@ async def run_ops_agent(
         "Return the ops plan."
     )
 
-    agent = get_agent()
     feedback = ""
     last_errors: list[str] = []
     for attempt in range(3):
-        run = await agent.run(prompt + feedback)
-        plan = run.output
+        plan = await parse_structured(
+            OpsPlan, SYSTEM, prompt + feedback, model=MODEL, effort="high"
+        )
         try:
             ops = parse_ops([op.model_dump() for op in plan.ops])
         except Exception as exc:  # noqa: BLE001 — malformed ops go back to the model

@@ -234,7 +234,7 @@ export default function Inspector({
               remove
             </button>
           </div>
-          <div className="note">Drag the handles on the plan to move its ends · Ctrl+C / Ctrl+V to copy.</div>
+          <div className="note">Drag the middle to slide it along the wall, or the end handles to resize · Ctrl+C / Ctrl+V to copy.</div>
         </div>
       )}
 

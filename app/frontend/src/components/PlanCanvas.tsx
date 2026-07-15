@@ -2,7 +2,7 @@ import { drag } from 'd3-drag';
 import { pointer, select } from 'd3-selection';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Op } from '../editing';
-import { isPendingId } from '../editing';
+import { isPendingId, roomDropOps, roomResizeOps } from '../editing';
 import {
   EXTERIOR_HALF,
   INTERIOR_HALF,
@@ -49,7 +49,6 @@ interface Props {
   onOps?: (ops: Op[]) => void;
   onRewrite?: (pvId: string, patch: Record<string, number | string>) => void;
   onWallMove?: (wallId: string, d: number) => void;
-  onRegion?: (r: { x: number; y: number; w: number; h: number }) => void;
   pendingIds?: Set<string>;
 }
 
@@ -57,8 +56,8 @@ const SNAP = 0.05;
 const snapT = (t: number) => Math.min(1, Math.max(0, Math.round(t / SNAP) * SNAP));
 
 type DragState =
-  | { kind: 'move'; obj: 'room' | 'fixture'; id: string; dx: number; dy: number }
-  | { kind: 'resize'; obj: 'room' | 'fixture'; id: string; dw: number; dh: number }
+  | { kind: 'move'; obj: 'room' | 'fixture'; id: string; dx: number; dy: number; alt: boolean }
+  | { kind: 'resize'; obj: 'room' | 'fixture'; id: string; dw: number; dh: number; alt: boolean }
   | null;
 
 interface DrawState {
@@ -80,7 +79,6 @@ export default function PlanCanvas({
   onOps,
   onRewrite,
   onWallMove,
-  onRegion,
   pendingIds,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -291,7 +289,8 @@ export default function PlanCanvas({
       }
       onTool?.('select');
       if (w >= 0.2 && h >= 0.2) {
-        if (wasTool === 'add-room') onRegion?.({ x, y, w, h });
+        // draw a room directly (like a fixture) — it's created + auto-selected for rename
+        if (wasTool === 'add-room') onOps?.([{ op: 'add_room', name: 'NEW ROOM', x, y, w, h }]);
         else onOps?.([{ op: 'add_fixture', x, y, w, h, label: '' }]);
       }
       e.stopPropagation();
@@ -346,9 +345,18 @@ export default function PlanCanvas({
           w: Math.max(minSide, snapM(nr.w)),
           h: Math.max(minSide, snapM(nr.h)),
         };
+        const src2 = obj === 'room' ? roomsById.get(id) : undefined;
+        // moving OR resizing a room reflows its neighbours (push/pull) unless Alt is held
+        const reflow = !dragState.alt && obj === 'room' && src2 !== undefined && src2.z === 0;
         if (isPendingId(id)) {
           // pending object: rewrite its originating add op in place
           onRewrite?.(id, rect);
+        } else if (reflow && src2) {
+          const ops =
+            dragState.kind === 'move'
+              ? roomDropOps(geometry, src2, rect.x - src2.x, rect.y - src2.y)
+              : roomResizeOps(geometry, src2, rect.w - src2.w, rect.h - src2.h);
+          onOps?.(ops.length ? ops : [{ op: 'resize_room', room_id: id, ...rect }]);
         } else if (obj === 'room') {
           onOps?.([{ op: 'resize_room', room_id: id, ...rect }]);
         } else {
@@ -517,7 +525,7 @@ export default function PlanCanvas({
                     y={Y(r.y)}
                     width={px(r.w)}
                     height={px(r.h)}
-                    fill="none"
+                    fill="rgba(154,103,0,0.14)"
                     stroke={AMBER}
                     strokeWidth={2.5}
                     strokeDasharray="3 3"
@@ -579,6 +587,32 @@ export default function PlanCanvas({
                     stroke={AMBER}
                     strokeWidth={2}
                     strokeDasharray="4 3"
+                  />
+                );
+              })}
+          </g>
+        )}
+
+        {/* original (v00) external-wall reference — grey ghost so a footprint change is visible */}
+        {original && (
+          <g pointerEvents="none">
+            {original.walls
+              .filter((w) => w.b === 'exterior')
+              .map((w) => {
+                const [lo, hi] = wallSpan(w);
+                const c = wallCoord(w);
+                const vert = wallIsVertical(w);
+                return (
+                  <line
+                    key={`origx-${w.id}`}
+                    x1={vert ? X(c) : X(lo)}
+                    y1={vert ? Y(lo) : Y(c)}
+                    x2={vert ? X(c) : X(hi)}
+                    y2={vert ? Y(hi) : Y(c)}
+                    stroke={FAINT}
+                    strokeWidth={2}
+                    strokeDasharray="5 4"
+                    opacity={0.7}
                   />
                 );
               })}
@@ -920,8 +954,8 @@ function SelectableRect({
     start.current = toMetres(e.clientX, e.clientY);
     setDragState(
       kind === 'move'
-        ? { kind: 'move', obj, id, dx: 0, dy: 0 }
-        : { kind: 'resize', obj, id, dw: 0, dh: 0 },
+        ? { kind: 'move', obj, id, dx: 0, dy: 0, alt: e.altKey }
+        : { kind: 'resize', obj, id, dw: 0, dh: 0, alt: e.altKey },
     );
   };
   const moveDrag = (e: React.PointerEvent, kind: 'move' | 'resize') => {
@@ -930,7 +964,11 @@ function SelectableRect({
     const { mx, my } = toMetres(e.clientX, e.clientY);
     const dx = snapM(mx - start.current.mx);
     const dy = snapM(my - start.current.my);
-    setDragState(kind === 'move' ? { kind, obj, id, dx, dy } : { kind, obj, id, dw: dx, dh: dy });
+    setDragState(
+      kind === 'move'
+        ? { kind, obj, id, dx, dy, alt: e.altKey }
+        : { kind, obj, id, dw: dx, dh: dy, alt: e.altKey },
+    );
   };
   const endDrag = (e: React.PointerEvent) => {
     if (!start.current) return;
@@ -1138,7 +1176,8 @@ function OpeningOverlay({
   onCommit: (t0: number, t1: number) => void;
 }) {
   const [local, setLocal] = useState<{ t0: number; t1: number } | null>(null);
-  const dragging = useRef<0 | 1 | null>(null);
+  const dragging = useRef<0 | 1 | 'move' | null>(null);
+  const moveStart = useRef<{ t: number; t0: number; t1: number } | null>(null);
   useEffect(() => setLocal(null), [openingId, t0, t1]);
 
   const cur = local ?? { t0, t1 };
@@ -1150,19 +1189,30 @@ function OpeningOverlay({
     ? { x1: X(c), y1: Y(a0), x2: X(c), y2: Y(a1) }
     : { x1: X(a0), y1: Y(c), x2: X(a1), y2: Y(c) };
 
-  const onDown = (which: 0 | 1) => (e: React.PointerEvent) => {
+  const onDown = (which: 0 | 1 | 'move') => (e: React.PointerEvent) => {
     if (!editable) return;
     e.stopPropagation();
     dragging.current = which;
     (e.target as Element).setPointerCapture(e.pointerId);
+    if (which === 'move') {
+      const { mx, my } = toMetres(e.clientX, e.clientY);
+      moveStart.current = { t: absToT(wall, vert ? my : mx), t0: cur.t0, t1: cur.t1 };
+    }
   };
   const onMove = (e: React.PointerEvent) => {
     if (dragging.current === null) return;
     e.stopPropagation();
     const { mx, my } = toMetres(e.clientX, e.clientY);
-    const t = snapT(absToT(wall, vert ? my : mx));
+    const raw = absToT(wall, vert ? my : mx);
+    const t = snapT(raw);
     if (dragging.current === 0) setLocal({ t0: Math.min(t, cur.t1 - SNAP), t1: cur.t1 });
-    else setLocal({ t0: cur.t0, t1: Math.max(t, cur.t0 + SNAP) });
+    else if (dragging.current === 1) setLocal({ t0: cur.t0, t1: Math.max(t, cur.t0 + SNAP) });
+    else if (moveStart.current) {
+      // slide the whole opening along the wall, keeping its width, clamped to [0,1]
+      const width = moveStart.current.t1 - moveStart.current.t0;
+      const nt0 = Math.max(0, Math.min(1 - width, snapT(moveStart.current.t0 + (raw - moveStart.current.t))));
+      setLocal({ t0: nt0, t1: nt0 + width });
+    }
   };
   const onUp = (e: React.PointerEvent) => {
     if (dragging.current === null) return;
@@ -1177,6 +1227,19 @@ function OpeningOverlay({
   return (
     <g>
       <line {...line} stroke={RED} strokeWidth={9} strokeLinecap="round" opacity={0.7} pointerEvents="none" />
+      {/* fat invisible grab over the bar — drag the middle to slide the whole opening */}
+      {editable && (
+        <line
+          {...line}
+          stroke="transparent"
+          strokeWidth={16}
+          strokeLinecap="butt"
+          style={{ cursor: 'move' }}
+          onPointerDown={onDown('move')}
+          onPointerMove={onMove}
+          onPointerUp={onUp}
+        />
+      )}
       <circle cx={line.x1} cy={line.y1} r={6.5} fill="#fff" stroke={RED} strokeWidth={3} style={{ cursor }} onPointerDown={onDown(0)} onPointerMove={onMove} onPointerUp={onUp} />
       <circle cx={line.x2} cy={line.y2} r={6.5} fill="#fff" stroke={RED} strokeWidth={3} style={{ cursor }} onPointerDown={onDown(1)} onPointerMove={onMove} onPointerUp={onUp} />
       <text
