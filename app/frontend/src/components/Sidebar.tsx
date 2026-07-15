@@ -32,12 +32,13 @@ export default function Sidebar({ plans, route, backendOk, busy, open, onNavigat
         <span className="b2">geometry-first review</span>
       </a>
       <div className="group">Workspace</div>
-      <button className={`item${route.page === 'library' ? ' active' : ''}`} onClick={() => go('#/')}>
+      <button
+        className={`item${route.page === 'library' || route.page === 'upload' ? ' active' : ''}`}
+        onClick={() => go('#/')}
+      >
         <span>Library</span>
       </button>
-      <button className={`item${route.page === 'upload' ? ' active' : ''}`} onClick={() => go('#/upload')}>
-        <span>Upload plan</span>
-      </button>
+      <div className="group">Diagnostics</div>
       <button className={`item${route.page === 'admin' ? ' active' : ''}`} onClick={() => go('#/admin')}>
         <span>Feature Checks</span>
       </button>
@@ -67,7 +68,7 @@ export default function Sidebar({ plans, route, backendOk, busy, open, onNavigat
           </button>
         );
       })}
-      <div className="foot">
+      <div className="foot" role="status" aria-live="polite">
         <span className={`dot${busy ? ' busy' : backendOk ? '' : ' err'}`} />
         {busy ? 'agent working…' : backendOk ? 'agent idle · backend ok' : 'backend unreachable'}
       </div>

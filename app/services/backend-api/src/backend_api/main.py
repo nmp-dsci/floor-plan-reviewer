@@ -504,6 +504,38 @@ def plan_image(plan_id: str) -> FileResponse:
     return FileResponse(path, media_type=media)
 
 
+@app.delete("/api/plans/{plan_id}")
+def delete_plan(plan_id: str) -> dict[str, bool]:
+    """Remove a plan and everything under it (review, versions, jobs, uploaded
+    image). Used to clear dead drafts from the library. Only files that live under
+    STORAGE_DIR are unlinked, so a seed image can never be removed."""
+    from pathlib import Path
+
+    with session() as db:
+        plan = db.get(Plan, plan_id)
+        if not plan:
+            raise HTTPException(404, "plan not found")
+        if plan.slug.startswith(SANDBOX_PREFIX):
+            raise HTTPException(403, "sandbox plans are managed automatically")
+        for review in db.execute(select(Review).where(Review.plan_id == plan_id)).scalars():
+            for v in _versions(db, review.id):
+                db.delete(v)
+            for job in db.execute(select(Job).where(Job.review_id == review.id)).scalars():
+                db.delete(job)
+            db.flush()  # children before parents — order manually, no ORM cascade declared
+            db.delete(review)
+        image_path = plan.image_path
+        db.flush()
+        db.delete(plan)
+        db.commit()
+    if image_path and image_path.startswith(str(STORAGE_DIR)):
+        try:
+            Path(image_path).unlink(missing_ok=True)
+        except OSError:
+            pass
+    return {"deleted": True}
+
+
 # ---------- Feature Checks sandbox ----------
 
 
@@ -512,16 +544,19 @@ def create_sandbox() -> dict[str, str]:
     """Throwaway review (clone of the seed original) for the Feature Checks tab.
     Hidden from the library; deleted after the run and swept on startup."""
     with session() as db:
-        source = db.execute(
+        # clone the earliest real plan that has a review+v0 (the seed). Robust to
+        # extra uploads sitting in the library — never assume exactly one plan exists.
+        source = None
+        src_review = None
+        for plan in db.execute(
             select(Plan).where(Plan.slug.not_like(f"{SANDBOX_PREFIX}%")).order_by(Plan.created_at)
-        ).scalar_one_or_none()
-        if not source:
-            raise HTTPException(409, "no seed plan to clone")
-        src_review = db.execute(
-            select(Review).where(Review.plan_id == source.id)
-        ).scalar_one_or_none()
-        if not src_review:
-            raise HTTPException(409, "seed plan has no review")
+        ).scalars():
+            rev = db.execute(select(Review).where(Review.plan_id == plan.id)).scalars().first()
+            if rev and _versions(db, rev.id):
+                source, src_review = plan, rev
+                break
+        if not source or not src_review:
+            raise HTTPException(409, "no seed plan with a review to clone")
         v0 = _versions(db, src_review.id)[0]
         sandbox_id = uuid.uuid4().hex[:8]
         plan = Plan(slug=f"{SANDBOX_PREFIX}{sandbox_id}", address="[feature-checks sandbox]")

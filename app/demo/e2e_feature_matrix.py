@@ -93,6 +93,8 @@ def main() -> None:
         with sync_playwright() as pw:
             browser = pw.chromium.launch()
             page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
+            # the first-run coach modal would block gestures; a real user sees it once
+            page.add_init_script("try{window.localStorage.setItem('fps-coach-dismissed','1')}catch(e){}")
             page.goto(f"{BASE}/#/review/{review_id}")
             expect(page.locator(".ctxbar .addr")).to_be_visible(timeout=20000)
             page.wait_for_timeout(600)

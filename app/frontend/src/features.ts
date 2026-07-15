@@ -28,6 +28,25 @@ export interface FeatureDef {
   check?: (ctx: CheckCtx) => Promise<void>;
 }
 
+/** Keyboard/mouse shortcuts — the single source for the in-app shortcut sheet (?),
+ * kept beside the capability registry so the two never drift. Each entry maps to a
+ * handler in Review.tsx / PlanCanvas.tsx. */
+export interface Shortcut {
+  keys: string;
+  action: string;
+}
+
+export const SHORTCUTS: Shortcut[] = [
+  { keys: 'Click', action: 'Select a room, wall, fixture or opening' },
+  { keys: 'Shift-click', action: 'Add to / remove from the selection' },
+  { keys: 'Drag', action: 'Move a room — neighbours trade space (Alt = free move)' },
+  { keys: '⌘C / ⌘V', action: 'Copy and paste the selected object' },
+  { keys: '⌘Z', action: 'Undo the last edit, then roll back the last version' },
+  { keys: 'Delete', action: 'Remove the selected object(s)' },
+  { keys: 'Esc', action: 'Clear the selection' },
+  { keys: '?', action: 'Open this shortcut sheet' },
+];
+
 const expect = (cond: boolean, msg: string): void => {
   if (!cond) throw new Error(msg);
 };
@@ -564,5 +583,15 @@ export const FEATURES: FeatureDef[] = [
       });
     },
     kind: 'contract',
+  },
+  // ---------- product health ----------
+  {
+    id: 'golden-path',
+    group: 'Product health',
+    feature: 'Golden path — 231 PFR',
+    human: 'Load 231 Peats Ferry Rd → maximise weekly rent inside the existing envelope',
+    ai: 'Agent re-prices the maximised layout from ≥ 3 live comps',
+    example: 'garage → Bed 4 · balcony → living · Bed 1 WIR + ensuite · front door to lounge',
+    kind: 'gesture', // covered by the always-run Playwright golden path (make -C app golden)
   },
 ];

@@ -54,6 +54,8 @@ export const api = {
   refreshComps: (id: string) =>
     json<{ comps: Comp[] }>(`/api/reviews/${id}/comps/refresh`, { method: 'POST' }),
   planImageUrl: (planId: string) => `/api/plans/${planId}/image`,
+  deletePlan: (planId: string) =>
+    json<{ deleted: boolean }>(`/api/plans/${planId}`, { method: 'DELETE' }),
   uploadPlan: async (file: File, address: string) => {
     const form = new FormData();
     form.append('file', file);

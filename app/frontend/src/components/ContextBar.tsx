@@ -1,32 +1,16 @@
-import { api } from '../api';
 import type { Review } from '../types';
 
 interface Props {
   review: Review;
   currentN: number;
-  mode: 'proposed' | 'delta';
-  busy: boolean;
-  onVersion: (n: number) => void;
-  onMode: (m: 'proposed' | 'delta') => void;
-  onRefreshComps: () => void;
-  onDeleteVersion: (n: number) => void;
-  onBookmark: (n: number) => void;
 }
 
-export default function ContextBar({
-  review,
-  currentN,
-  mode,
-  busy,
-  onVersion,
-  onMode,
-  onRefreshComps,
-  onDeleteVersion,
-  onBookmark,
-}: Props) {
-  const head = review.head_n ?? 0;
-  const headV = review.versions[review.versions.length - 1];
+/** Top identity bar: address · configuration · areas · headline rent.
+ * Version identity and the proposed/delta lens live in the bottom ReviewStrip;
+ * the full rent story lives in the dock's RENT tab. */
+export default function ContextBar({ review, currentN }: Props) {
   const baseline = review.baseline_per_week;
+  const headV = review.versions[review.versions.length - 1];
   const proposed = headV ? headV.rent.proposed_per_week : baseline;
   const uplift = proposed - baseline;
   const current = review.versions.find((v) => v.n === currentN);
@@ -49,7 +33,12 @@ export default function ContextBar({
             </span>
             <span className="mono faintsep">/ {total.toFixed(0)} m² envelope</span>
             {opportunity !== undefined && opportunity > 0.5 && (
-              <span className="mono opp">{opportunity.toFixed(0)} m² to unlock</span>
+              <span
+                className="mono opp"
+                title={`The envelope allows ${total.toFixed(0)} m²; the plan uses ${internal.toFixed(0)} m². This much interior isn't yet assigned to habitable rooms.`}
+              >
+                {opportunity.toFixed(0)} m² headroom
+              </span>
             )}
           </span>
         )}
@@ -60,78 +49,6 @@ export default function ContextBar({
           <span className={`mono ${uplift >= 0 ? 'up' : 'down'}`}>
             {uplift >= 0 ? '+' : '−'}${Math.abs(uplift).toFixed(0)}
           </span>
-        </span>
-      </div>
-      <div className="subbar">
-        <span className="versions">
-          {review.versions.map((v) => (
-            <button
-              key={v.n}
-              className={v.n === currentN ? 'active' : ''}
-              title={`$${v.rent.proposed_per_week.toFixed(0)}/wk · ${v.config}${v.saved ? ' · bookmarked' : ''}`}
-              onClick={() => onVersion(v.n)}
-            >
-              v{String(v.n).padStart(2, '0')}
-              {v.saved && v.n > 0 ? <span className="star">★</span> : ''}
-            </button>
-          ))}
-        </span>
-        <span className="tabs">
-          <button className={mode === 'proposed' ? 'active' : ''} onClick={() => onMode('proposed')}>
-            Proposed
-          </button>
-          <button className={mode === 'delta' ? 'active' : ''} onClick={() => onMode('delta')}>
-            Delta
-          </button>
-        </span>
-        {currentN !== head ? (
-          <span className="readonly">
-            read-only — viewing v{String(currentN).padStart(2, '0')} of v{String(head).padStart(2, '0')}
-            <button className="ghost" onClick={() => onVersion(head)}>
-              jump to head
-            </button>
-            {head > 0 && (
-              <button
-                className="ghost danger"
-                disabled={busy}
-                title={`Delete head v${String(head).padStart(2, '0')} — rolls back to v${String(head - 1).padStart(2, '0')}`}
-                onClick={() => onDeleteVersion(head)}
-              >
-                delete v{String(head).padStart(2, '0')}
-              </button>
-            )}
-          </span>
-        ) : (
-          head > 0 && (
-            <button
-              className="ghost danger delver"
-              disabled={busy}
-              title={`Delete this version — rolls back to editable v${String(head - 1).padStart(2, '0')}`}
-              onClick={() => onDeleteVersion(head)}
-            >
-              delete v{String(head).padStart(2, '0')}
-            </button>
-          )
-        )}
-        <span className="acts">
-          {currentN > 0 && (
-            <button
-              className="linklike bookmark"
-              title="Bookmarked versions survive auto-pruning (only the original and latest are kept otherwise)"
-              onClick={() => onBookmark(currentN)}
-            >
-              {current?.saved ? '★ bookmarked' : '☆ bookmark'}
-            </button>
-          )}
-          <a href={api.exportUrl(review.review_id, currentN)} target="_blank" rel="noreferrer">
-            ⤓ PNG
-          </a>
-          <a href={api.summaryUrl(review.review_id)} target="_blank" rel="noreferrer">
-            ⤓ SUMMARY.md
-          </a>
-          <button className="linklike" onClick={onRefreshComps}>
-            refresh comps
-          </button>
         </span>
       </div>
     </div>
