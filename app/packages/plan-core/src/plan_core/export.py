@@ -229,13 +229,13 @@ def render_png(
     plans_h = max(p.ph for p in panels)
     title_lines = [t for t in (floor_label, geo.address, subtitle) if t]
     title_h = 90 + 34 * len(title_lines)
-    width = plans_w + 2 * margin
-    height = caption_h + plans_h + 2 * margin + title_h
+    width = plans_w
+    height = caption_h + plans_h + title_h
 
     image = Image.new("RGB", (width, height), WHITE)
     draw = ImageDraw.Draw(image)
 
-    cursor_x = margin
+    cursor_x = 0
     for p in panels:
         ox = cursor_x + margin - p.ex0 * PX_PER_M
         oy = caption_h + margin - p.ey0 * PX_PER_M
@@ -251,7 +251,7 @@ def render_png(
         _draw_plan(draw, p.rooms, p.walls, p.fixtures, ox, oy)
         cursor_x += p.pw + gutter
 
-    ty = caption_h + plans_h + 2 * margin + 20
+    ty = caption_h + plans_h + 20
     for i, line in enumerate(title_lines):
         font = _font(26 if i < 2 else 18, bold=i < 2)
         text = str(line).upper()
