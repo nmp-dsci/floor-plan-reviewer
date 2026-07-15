@@ -1,5 +1,13 @@
 # Floor-Plan Studio — demo walkthroughs
 
+> **Note — recorded artifacts predate the Agent SDK migration.** The committed videos and their
+> sidecars (`.mp4` / `.srt` / `.webm`), and the recorder scripts that narrate them, still say
+> **DeepSeek / Pydantic AI**. The app has since moved all LLM calls (ops, comps, vision) to the
+> **Claude Agent SDK** (running on the operator's Claude subscription via `CLAUDE_CODE_OAUTH_TOKEN`).
+> Read the "DeepSeek AGENT" / "Pydantic AI on DeepSeek" mentions below as historical; the loop they
+> show is unchanged, only the LLM backend differs. The videos/SRT and scripts are intentionally left
+> as-is (re-recording is a separate task).
+
 Three narrated videos, each a real unedited Playwright session against the local compose stack
 (`make -C app up`). **Narration is spoken** (Deepgram Aura TTS, Australian voice
 `aura-2-hyperion-en`) *and* burned in as the caption bar — one compact line per scene, timed to

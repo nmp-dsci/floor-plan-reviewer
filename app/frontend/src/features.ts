@@ -108,7 +108,7 @@ export const FEATURES: FeatureDef[] = [
     id: 'room-move-resize',
     group: 'Rooms',
     feature: 'Move / resize',
-    human: 'Drag the body (0.05m snap) or corner handle; numeric x/y/w/h fields',
+    human: 'Drag the body (0.05m snap) or corner handle — neighbours reflow/swap to trade space (Alt = free move); numeric x/y/w/h fields',
     ai: 'resize_room',
     example: 'shrink a bedroom 0.2m',
     check: async (ctx) => {
@@ -354,7 +354,7 @@ export const FEATURES: FeatureDef[] = [
     id: 'opening-modify',
     group: 'Walls & openings',
     feature: 'Move / retype / remove opening',
-    human: 'Drag end handles · door/window/open toggle · Delete',
+    human: 'Drag end handles, or the middle to slide it along the wall · door/window/open toggle · Delete',
     ai: 'modify_opening / remove_opening',
     example: 'door → window, then remove',
     check: async (ctx) => {
