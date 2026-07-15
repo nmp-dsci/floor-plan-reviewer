@@ -346,7 +346,9 @@ export default function PlanCanvas({
             dragState.kind === 'move'
               ? roomDropOps(geometry, src2, rect.x - src2.x, rect.y - src2.y)
               : roomResizeOps(geometry, src2, rect.w - src2.w, rect.h - src2.h);
-          onOps?.(ops.length ? ops : [{ op: 'resize_room', room_id: id, ...rect }]);
+          // empty ops means the move/resize was fully clamped by a min-size neighbour —
+          // emit nothing (don't fall back to the raw unclamped rect, which defeats the clamp)
+          if (ops.length) onOps?.(ops);
         } else if (obj === 'room') {
           onOps?.([{ op: 'resize_room', room_id: id, ...rect }]);
         } else {

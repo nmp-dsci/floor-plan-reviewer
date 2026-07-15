@@ -319,6 +319,13 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
             )
         elif isinstance(op, MergeRooms):
             r, o = g.room(op.room_id), g.room(op.other_id)
+            if r.level != o.level:
+                # levels share a local origin, so cross-level rooms can overlap in
+                # coordinates and wrongly pass the rectangularity check — never merge them
+                warnings.append(
+                    f"merge_rooms {op.room_id}+{op.other_id}: different levels; skipped"
+                )
+                continue
             x0, y0 = min(r.x, o.x), min(r.y, o.y)
             x1, y1 = max(r.x2, o.x2), max(r.y2, o.y2)
             union_area = (x1 - x0) * (y1 - y0)
