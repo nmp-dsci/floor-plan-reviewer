@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Floor-Plan Studio — Restyle Plan (Drafting Ink 2.0)</title>
+<style>
+  /* ===== Drafting Ink tokens — mirrored from app/frontend/src/styles.css ===== */
+  :root {
+    --ink: #141416;
+    --paper: #ffffff;
+    --grey: #e1e1e3;
+    --grey-2: #f4f4f5;
+    --faint: #74747a;
+    --red: #e23d28;
+    --red-bg: #fdecea;
+    --green: #1a7f37;
+    --green-bg: #e6f4ea;
+    --amber: #9a6700;
+    --amber-bg: #fdf3d7;
+    --mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > *, :where([style*="display:grid"], [style*="display:flex"]) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, li, dd, td, th, figcaption) { overflow-wrap: anywhere; }
+  :where(img, svg) { max-width: 100%; height: auto; }
+
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px; line-height: 1.5;
+    color: var(--ink); background: var(--paper);
+  }
+  .page { max-width: 1140px; margin: 0 auto; padding: 40px 28px 120px; }
+
+  /* type scale */
+  .kicker { font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--faint); font-weight: 600; }
+  h1 { font-size: 26px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; margin: 6px 0 8px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.18em; font-weight: 700; margin: 0; }
+  h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.14em; font-weight: 700; margin: 0 0 8px; }
+  p { margin: 0 0 10px; }
+  .standfirst { font-size: 15px; max-width: 76ch; }
+  .footnote { font-size: 11.5px; color: var(--faint); }
+  .mono, code { font-family: var(--mono); font-size: 0.92em; }
+  code { background: var(--grey-2); padding: 0 4px; }
+  a { color: var(--ink); }
+
+  /* section spine */
+  .section { margin-top: 56px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 3px solid var(--ink); padding-bottom: 8px; margin-bottom: 20px; }
+  .section-head .no { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+  .section-head h2 { font-size: 15px; }
+
+  /* card recipe */
+  .card { border: 3px solid var(--ink); background: var(--paper); }
+  .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 14px; border-bottom: 3px solid var(--ink); }
+  .card-head h3 { margin: 0; font-size: 11.5px; letter-spacing: 0.18em; }
+  .card-head .meta { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); }
+  .card-body { padding: 14px; }
+
+  /* chips */
+  .chip { display: inline-block; border: 1.5px solid var(--ink); padding: 1px 7px 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; white-space: nowrap; }
+  .chip.red { border-color: var(--red); color: var(--red); }
+  .chip.green { border-color: var(--green); color: var(--green); }
+  .chip.amber { border-color: var(--amber); color: var(--amber); }
+  .chip.faint { border-color: var(--grey); color: var(--faint); }
+  .chip.fill { background: var(--ink); color: var(--paper); }
+
+  /* banner recipe */
+  .banner { border-left: 4px solid var(--ink); background: var(--grey-2); padding: 10px 14px; margin: 12px 0; }
+  .banner.red { border-left-color: var(--red); }
+  .banner.amber { border-left-color: var(--amber); }
+  .banner.green { border-left-color: var(--green); }
+
+  /* tables */
+  table.reg { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.reg th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; padding: 8px 10px; border-bottom: 2px solid var(--ink); }
+  table.reg td { padding: 8px 10px; border-bottom: 1px solid var(--grey); vertical-align: top; }
+  .tablewrap { overflow-x: auto; }
+
+  /* stat strip */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: 3px solid var(--ink); }
+  .stat { padding: 14px 16px; border-right: 1px solid var(--grey); }
+  .stat:last-child { border-right: none; }
+  .stat .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--faint); }
+  .stat .value { font-family: var(--mono); font-size: 22px; font-weight: 700; margin-top: 2px; }
+  .stat .value small { font-size: 12px; font-weight: 400; color: var(--faint); }
+  .stat .value.green { color: var(--green); }
+
+  /* audit figures */
+  .shot { border: 3px solid var(--ink); margin: 0; }
+  .shot img { display: block; width: 100%; border-bottom: 3px solid var(--ink); }
+  .shot figcaption { padding: 10px 14px 12px; }
+  .shot .cap-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.16em; font-weight: 700; margin-bottom: 6px; }
+  .findings { margin: 0; padding: 0; list-style: none; }
+  .findings li { display: flex; gap: 9px; padding: 5px 0; border-top: 1px solid var(--grey); font-size: 13px; align-items: baseline; }
+  .findings li:first-child { border-top: none; }
+  .fid { font-family: var(--mono); font-size: 11px; color: var(--faint); flex: 0 0 26px; }
+  .audit-grid { display: grid; gap: 26px; }
+
+  /* keep / change two-up */
+  .two-up { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+  ul.plain { margin: 0; padding-left: 18px; }
+  ul.plain li { margin: 4px 0; }
+
+  /* ====== mockups ====== */
+  .mock { border: 3px solid var(--ink); background: var(--paper); font-size: 11px; }
+  .mock-note { font-size: 11.5px; color: var(--faint); margin-top: 8px; }
+  .m-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 3px solid var(--ink); flex-wrap: wrap; }
+  .m-top .addr { font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: 13px; }
+  .m-top .conf { color: var(--faint); font-family: var(--mono); font-size: 11px; }
+  .m-rent { text-align: right; }
+  .m-rent .big { font-family: var(--mono); font-size: 18px; font-weight: 700; }
+  .m-rent .big .up { color: var(--green); }
+  .m-rent .sub { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.1em; }
+  .m-frame { display: grid; grid-template-columns: minmax(0, 1fr) 300px; min-height: 430px; }
+  .m-canvas { position: relative; background: var(--paper); border-right: 3px solid var(--ink); padding: 14px; overflow: hidden; }
+  .m-room { position: absolute; border: 3px solid var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; text-transform: uppercase; font-weight: 700; font-size: 10px; letter-spacing: 0.06em; text-align: center; }
+  .m-room .dims { font-family: var(--mono); font-weight: 400; color: var(--faint); font-size: 9px; letter-spacing: 0; text-transform: none; }
+  .m-room.sel { border-color: var(--red); border-style: dashed; color: var(--red); }
+  .m-float { position: absolute; display: flex; gap: 0; border: 2px solid var(--ink); background: var(--paper); }
+  .m-float button, .m-float span { border: none; background: var(--paper); font-family: var(--mono); font-size: 11px; padding: 4px 9px; border-right: 1px solid var(--grey); }
+  .m-float :last-child { border-right: none; }
+  .m-legend { position: absolute; right: 14px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 4px 10px; max-width: calc(100% - 28px); background: var(--paper); border: 2px solid var(--ink); padding: 5px 10px; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .m-legend .sw { display: inline-block; width: 14px; height: 0; margin-right: 4px; vertical-align: middle; }
+  .m-dock { display: flex; flex-direction: column; min-width: 0; }
+  .m-tabs { display: flex; border-bottom: 3px solid var(--ink); }
+  .m-tabs .t { flex: 1; text-align: center; padding: 8px 2px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; border-right: 1px solid var(--grey); }
+  .m-tabs .t:last-child { border-right: none; }
+  .m-tabs .t.on { background: var(--ink); color: var(--paper); }
+  .m-dockbody { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .m-strip { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 3px solid var(--ink); padding: 8px 14px; flex-wrap: wrap; }
+  .m-pills { display: flex; }
+  .m-pills .p { border: 2px solid var(--ink); padding: 3px 9px; font-family: var(--mono); font-size: 10.5px; margin-left: -2px; background: var(--paper); }
+  .m-pills .p.on { background: var(--ink); color: var(--paper); }
+  .m-pills .p.star::before { content: "★ "; font-size: 9px; }
+  .m-seg { display: flex; border: 2px solid var(--ink); }
+  .m-seg .s { padding: 3px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+  .m-seg .s.on { background: var(--ink); color: var(--paper); }
+  .m-meter { border: 2px solid var(--ink); height: 18px; position: relative; background: var(--grey-2); }
+  .m-meter .fill { position: absolute; inset: 0 auto 0 0; width: 58%; background: var(--green-bg); border-right: 3px solid var(--green); }
+  .m-meter .tick { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
+  .m-contrib { border-top: 2px solid var(--ink); }
+  .m-contrib .row { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--grey); font-size: 11px; }
+  .m-contrib .row .amt { font-family: var(--mono); color: var(--green); white-space: nowrap; }
+  .m-contrib .row .amt.zero { color: var(--faint); }
+
+  .m-lib { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+  .m-card { border: 3px solid var(--ink); display: flex; flex-direction: column; }
+  .m-thumb { height: 110px; background: var(--grey-2); display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; border-bottom: 3px solid var(--ink); position: relative; }
+  .m-thumb .roomsketch { position: absolute; border: 2px solid var(--ink); }
+  .m-cardbody { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .m-cardbody .nm { font-weight: 700; font-size: 12px; }
+  .m-cardbody .cfg { font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
+  .m-btn { display: inline-block; border: 3px solid var(--ink); background: var(--ink); color: var(--paper); text-transform: uppercase; font-weight: 700; font-size: 10.5px; letter-spacing: 0.08em; padding: 6px 12px; text-align: center; }
+  .m-btn.ghost { background: var(--paper); color: var(--ink); border: 2px solid var(--grey); }
+  .m-drop { border: 3px dashed var(--faint); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 26px 16px; text-align: center; color: var(--faint); }
+  .m-steps { display: flex; gap: 0; border: 3px solid var(--ink); }
+  .m-steps .st { flex: 1; padding: 10px 12px; border-right: 1px solid var(--grey); }
+  .m-steps .st:last-child { border-right: none; }
+  .m-steps .st .n { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .m-steps .st.on { background: var(--ink); color: var(--paper); }
+  .m-steps .st.on .n { color: var(--paper); }
+  .m-steps .st .t { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; margin-top: 2px; }
+
+  /* diff snippets */
+  .m-diff { font-family: var(--mono); font-size: 11.5px; border: 2px solid var(--ink); }
+  .m-diff .hunk { color: var(--faint); padding: 3px 8px; display: flex; justify-content: space-between; gap: 8px; }
+  .m-diff .add { background: var(--green-bg); padding: 2px 8px; }
+  .m-diff .del { background: var(--red-bg); padding: 2px 8px; }
+
+  /* phases */
+  .phase { border: 3px solid var(--ink); margin-bottom: 18px; }
+  .phase .p-head { display: flex; align-items: baseline; gap: 12px; padding: 10px 14px; border-bottom: 3px solid var(--ink); flex-wrap: wrap; }
+  .phase .p-head .pn { font-family: var(--mono); font-weight: 700; font-size: 13px; }
+  .phase .p-head h3 { margin: 0; flex: 1; }
+  .phase .p-body { padding: 12px 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .phase .p-col .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--faint); margin-bottom: 4px; }
+  .phase ul { margin: 0; padding-left: 16px; font-size: 12.5px; }
+  .phase li { margin: 3px 0; }
+
+  /* decisions */
+  .q { border: 3px solid var(--ink); margin-bottom: 18px; }
+  .q .q-head { padding: 10px 14px; border-bottom: 3px solid var(--ink); display: flex; gap: 10px; align-items: baseline; }
+  .q .q-head .qn { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+  .q .q-body { padding: 12px 14px; }
+  .q label.opt { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border: 2px solid var(--grey); margin-bottom: 8px; cursor: pointer; }
+  .q label.opt:hover { border-color: var(--ink); }
+  .q label.opt input { margin-top: 3px; }
+  .q .opt .t { font-weight: 700; font-size: 13px; }
+  .q .opt .d { font-size: 12px; color: var(--faint); }
+  .q .queue { border: 3px solid var(--ink); background: var(--ink); color: var(--paper); text-transform: uppercase; font-weight: 700; font-size: 11px; letter-spacing: 0.08em; padding: 8px 16px; cursor: pointer; }
+  .q .queue:hover { background: var(--red); border-color: var(--red); }
+  .q .queued-note { font-size: 11px; color: var(--green); margin-left: 10px; display: none; }
+  .q.done .queued-note { display: inline; }
+
+  .mermaid { display: flex; justify-content: center; margin: 10px 0; overflow-x: auto; }
+
+  @media (max-width: 860px) {
+    .m-frame { grid-template-columns: 1fr; }
+    .m-canvas { border-right: none; border-bottom: 3px solid var(--ink); min-height: 320px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ============ MASTHEAD ============ -->
+  <div class="kicker">Floor-Plan Studio · Frontend Proposal · 2026-07-15</div>
+  <h1>Restyle Plan — Drafting Ink 2.0</h1>
+  <p class="standfirst">
+    A full pass over the running app (six surfaces, screenshots below) to make it <strong>engaging and
+    user-friendly with functionality unchanged</strong>: load a floor plan, edit it with the agent or by hand,
+    and maximise weekly rent inside the existing envelope. The restyle keeps the Drafting Ink brand and the
+    locked canvas semantics; it re-architects layout, hierarchy, language, and guidance. One always-run
+    <strong>golden-path test — 231 Peats Ferry Rd</strong> ($900/wk → maximise, garage + balcony to internal
+    space, kitchen redesign, BED 1 walk-in robe + ensuite from the hall entry, front door moved to the lounge)
+    gates every phase.
+  </p>
+
+  <div class="stats" style="margin-top:18px">
+    <div class="stat"><div class="label">Surfaces audited</div><div class="value">6</div></div>
+    <div class="stat"><div class="label">Findings</div><div class="value">14 <small>F1–F14</small></div></div>
+    <div class="stat"><div class="label">Golden test</div><div class="value">231-PFR</div></div>
+    <div class="stat"><div class="label">Rent story (seed)</div><div class="value green">+$210<small>/wk</small></div></div>
+    <div class="stat"><div class="label">Phases</div><div class="value">P0–P5</div></div>
+  </div>
+
+  <!-- ============ S1 GOAL ============ -->
+  <div class="section">
+    <div class="section-head"><span class="no">01</span><h2>Goal, current state, non-goals</h2></div>
+    <p><strong>Goal.</strong> Same product, better experience: a first-time property owner should be able to upload a
+    listing floor plan, understand what the agent proposes, steer it, and read the rent uplift — without learning
+    the internal vocabulary (<span class="mono">HEAD</span>, <span class="mono">vision ingest</span>,
+    <span class="mono">@@ c02 · v05 @@</span>) first.</p>
+    <p><strong>Current state.</strong> The app is functionally complete and well-tested (Feature Checks: 20 PASS · 0 FAIL),
+    but it is presented as an engineer's console: a scrolling document of stacked cards, raw diff hunks, native file
+    inputs, and 10px hint strips. The strongest asset — the plan itself and its growing rent — is not staged.</p>
+    <p><strong>Non-goals.</strong> No behaviour changes to the validated op pipeline
+    (<span class="mono">POST /reviews/{id}/edits</span> · <span class="mono">/comments</span>), no new canvas semantics,
+    no backend rework beyond two small optional endpoints flagged in §7. The Feature Checks matrix is the
+    functionality contract: <strong>every existing check must pass unchanged after each phase.</strong></p>
+  </div>
+
+  <!-- ============ S2 AUDIT ============ -->
+  <div class="section">
+    <div class="section-head"><span class="no">02</span><h2>Current-state audit — what the screenshots show</h2></div>
+    <p class="footnote">Captured 2026-07-15 from the running stack (frontend :5175), seeded 231 Peats Ferry Rd review at v05. Severity: <span class="chip red">High</span> blocks comprehension for a non-technical user · <span class="chip amber">Med</span> slows everyone down · <span class="chip faint">Low</span> polish.</p>
+
+    <div class="audit-grid">
+
+      <figure class="shot">
+        <img src="s07_shots/library.png" alt="Plan Library: properties table and upload panel">
+        <figcaption>
+          <div class="cap-title">Plan Library — home screen</div>
+          <ul class="findings">
+            <li><span class="fid">F1</span><span class="chip red">High</span><span>A floor-plan product with <strong>no plan imagery</strong> on its home screen — the library is a bare table. Thumbnails exist for free: <span class="mono">/api/plans/{id}/image</span> and <span class="mono">/api/reviews/{id}/versions/{n}/export.png</span> already serve them.</span></li>
+            <li><span class="fid">F2</span><span class="chip red">High</span><span>Upload is a native <em>Choose file</em> input plus a jargon button (<span class="mono">UPLOAD → VISION INGEST</span>). No drag-and-drop, no image preview, no progress state.</span></li>
+            <li><span class="fid">F3</span><span class="chip amber">Med</span><span>Status vocabulary is internal: <span class="mono">HEAD v05</span>, <span class="mono">needs ingest</span>. A row like <span class="mono">screenshot-2026-07-14-at-3.36.13pm.png-28df40</span> gives the user no way to finish setup, rename, or delete it — dead rows accumulate.</span></li>
+            <li><span class="fid">F4</span><span class="chip faint">Low</span><span>"Upload plan" in the nav routes to this same page (<span class="mono">#/upload</span> → Library with focus) — two nav items, one destination.</span></li>
+          </ul>
+        </figcaption>
+      </figure>
+
+      <figure class="shot">
+        <img src="s07_shots/review_v05.png" alt="Review page at v05, proposed view">
+        <figcaption>
+          <div class="cap-title">Review — proposed v05 (the core surface)</div>
+          <ul class="findings">
+            <li><span class="fid">F5</span><span class="chip red">High</span><span>The page is a <strong>scrolling document, not a workspace</strong>: the tall plan overflows the viewport and the right rail stacks four cards (Inspector, Ask the Agent, Change Register, Rent Evidence) — reading the rent evidence scrolls the plan away. No zoom, no fit-to-view, no visible undo.</span></li>
+            <li><span class="fid">F6</span><span class="chip red">High</span><span>The rent story — the product's whole point — is a small mono line in the header (<span class="mono">$900/wk → $1110/wk +$210</span>). No baseline-vs-comps context, no per-change contribution, no trend across versions.</span></li>
+            <li><span class="fid">F7</span><span class="chip amber">Med</span><span>Version pills (<span class="mono">v00 v05</span>) and view modes (<span class="mono">PROPOSED / DELTA</span>) sit in one row and look like the same control — version identity and lens are conflated.</span></li>
+            <li><span class="fid">F8</span><span class="chip amber">Med</span><span>Unexplained chip <span class="mono">97 M² TO UNLOCK</span> (envelope headroom) and easy-to-miss flag <span class="mono">⚑ rent not re-assessed</span> — the two numbers a user most needs explained.</span></li>
+            <li><span class="fid">F9</span><span class="chip amber">Med</span><span>The Change Register is a raw unified diff (<span class="mono">@@ c02 · v05 · balcony: LIVING +$0/wk @@</span>) — precise, but unreadable without knowing diff syntax.</span></li>
+          </ul>
+        </figcaption>
+      </figure>
+
+      <figure class="shot">
+        <img src="s07_shots/review_selected.png" alt="Wall selected: inspector shows wall actions, agent panel shows target chip">
+        <figcaption>
+          <div class="cap-title">Review — object selected (direct edit + agent targeting)</div>
+          <ul class="findings">
+            <li><span class="fid">F10</span><span class="chip amber">Med</span><span>The two-lane model (Inspector = instant direct edits · Ask the Agent = queued comments) is genuinely good — but it's explained only by caption sentences inside each card. First-run users get no walkthrough of <em>select → describe → add → send</em>, and the three-state lifecycle (selected / queued / sent) is text, not state you can see.</span></li>
+            <li><span class="fid">F11</span><span class="chip faint">Low</span><span>Canvas help is one 10px strip ("click to select · drag a room to reshape neighbours (Alt = free move) · …"). Power shortcuts (⌘C/⌘V, ⌘Z, Delete, shift-click) exist per the Feature Checks but are undiscoverable — no cheat sheet.</span></li>
+          </ul>
+        </figcaption>
+      </figure>
+
+      <figure class="shot">
+        <img src="s07_shots/review_delta.png" alt="Delta view with green/red/amber overlays">
+        <figcaption>
+          <div class="cap-title">Review — delta view v00 → v05</div>
+          <ul class="findings">
+            <li><span class="fid">F12</span><span class="chip amber">Med</span><span>The delta lens is the most persuasive view in the product (<span class="mono">BALCONY → LIVING</span>, <span class="mono">− GARAGE</span>, <span class="mono">+ Pantry</span>…) but there is <strong>no on-screen legend</strong> for green = added / red = removed / amber = modified, and overlay labels collide with room labels on dense plans.</span></li>
+          </ul>
+        </figcaption>
+      </figure>
+
+      <figure class="shot">
+        <img src="s07_shots/ingest.png" alt="Vision ingestion page, step 1 extract geometry">
+        <figcaption>
+          <div class="cap-title">Vision ingestion — post-upload wizard</div>
+          <ul class="findings">
+            <li><span class="fid">F13</span><span class="chip amber">Med</span><span>The three-step flow (extract → verify → set rent &amp; approve) exists but reads as one long page headed <span class="mono">STEP 1 — EXTRACT GEOMETRY</span>; no stepper showing where you are, how many steps remain, or what "approve" unlocks. Copy leads with implementation ("drafts schema-v2 geometry").</span></li>
+          </ul>
+        </figcaption>
+      </figure>
+
+      <figure class="shot">
+        <img src="s07_shots/feature_checks.png" alt="Feature checks parity matrix, 20 pass 0 fail">
+        <figcaption>
+          <div class="cap-title">Feature Checks — parity matrix</div>
+          <ul class="findings">
+            <li><span class="fid">F14</span><span class="chip faint">Low</span><span>Excellent engineering surface; keep as-is. Two reframes: it lives at <span class="mono">#/admin</span> but is presented as a first-class nav item next to Library (confusing for owners), and the golden-path scenario (§5) deserves a row here so product health is visible in-app.</span></li>
+          </ul>
+        </figcaption>
+      </figure>
+
+    </div>
+  </div>
+
+  <!-- ============ S3 LOCKED ============ -->
+  <div class="section">
+    <div class="section-head"><span class="no">03</span><h2>What stays locked</h2></div>
+    <div class="two-up">
+      <div class="card">
+        <div class="card-head"><h3>Locked — brand &amp; canvas</h3><span class="meta">.claude/skills/frontend-style</span></div>
+        <div class="card-body">
+          <ul class="plain">
+            <li>Ink-on-paper monochrome chrome; <strong>red = selection / negative / destructive, green = positive</strong> — meanings never drift.</li>
+            <li>Canvas semantics: ink walls (exterior thicker), red selection, green/red/amber delta, labels + mono dims always visible on every room.</li>
+            <li>All numerals in <span class="mono">--mono</span>; no shadows, radii, gradients; tokens only from <span class="mono">app/frontend/src/styles.css :root</span>.</li>
+            <li>The shared validated pipeline: humans <span class="mono">POST /edits</span>, agent via <span class="mono">/comments</span> — one validator, envelope immutable.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Open to change — this plan</h3><span class="meta">layout · language · guidance</span></div>
+        <div class="card-body">
+          <ul class="plain">
+            <li>Page architecture: document-scroll → full-height workspace (§4·M1).</li>
+            <li>Hierarchy: rent story promoted to a first-class panel (§4·M2).</li>
+            <li>Library, upload and ingest flows (§4·M3, M4).</li>
+            <li>Vocabulary: plain-English primary labels, drafting flavour kept in kickers (§4 copy map).</li>
+            <li>Guidance: empty states, first-run hints, shortcut sheet, legends.</li>
+            <li>New tokens (e.g. <span class="mono">--amber-bg</span>) added to <span class="mono">styles.css</span> + skill table first, per the do/don't rules.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ S4 PROPOSAL ============ -->
+  <div class="section">
+    <div class="section-head"><span class="no">04</span><h2>Proposed experience — mocked in Drafting Ink</h2></div>
+
+    <h3 style="margin-top:10px">M1 · Review becomes a workspace, not a document</h3>
+    <p>Full-viewport frame. The canvas owns the centre with floating zoom / fit / undo controls and a persistent
+    delta legend. The four stacked cards become a <strong>tabbed dock</strong> (right, 300–360px): EDIT (Inspector),
+    AGENT (queue), HISTORY (versions + register), RENT (story + comps). A bottom strip separates <em>version
+    identity</em> (pills, bookmarks) from <em>lens</em> (PROPOSED | DELTA segmented control) — resolving F5, F7, F12.</p>
+
+    <div class="mock" role="img" aria-label="Mockup of the proposed review workspace">
+      <div class="m-top">
+        <div>
+          <div class="addr">231 Peats Ferry Road, Hornsby</div>
+          <div class="conf">4 bed · 3 bath · 2 wc &nbsp;·&nbsp; 119 m² internal / 216 m² envelope &nbsp;·&nbsp; <span class="chip amber" title="Envelope headroom">97 m² headroom</span></div>
+        </div>
+        <div class="m-rent">
+          <div class="big">$900 → <span class="up">$1,110/wk</span> <span class="up">+$210</span></div>
+          <div class="sub">estimated weekly rent · 5 live comps · re-priced v05</div>
+        </div>
+      </div>
+      <div class="m-frame">
+        <div class="m-canvas">
+          <div class="m-float" style="left:14px; top:14px">
+            <button>−</button><span class="mono">100%</span><button>+</button><button>FIT</button><button>⌘Z UNDO</button>
+          </div>
+          <div class="m-room" style="left:16%; top:16%; width:34%; height:26%;">Living<span class="dims">7.12 × 2.80m</span></div>
+          <div class="m-room sel" style="left:52%; top:16%; width:20%; height:38%;">Kitchen<span class="dims">4.32 × 2.60m</span></div>
+          <div class="m-room" style="left:16%; top:44%; width:24%; height:34%;">Lounge<span class="dims">4.92 × 4.13m</span></div>
+          <div class="m-room" style="left:42%; top:56%; width:30%; height:26%;">Bed 1<span class="dims">3.08 × 3.78m</span></div>
+          <div class="m-legend">
+            <span><span class="sw" style="border-top:3px solid var(--green)"></span>Added</span>
+            <span><span class="sw" style="border-top:3px dashed var(--red)"></span>Removed</span>
+            <span><span class="sw" style="border-top:3px dotted var(--amber)"></span>Modified</span>
+          </div>
+        </div>
+        <div class="m-dock">
+          <div class="m-tabs">
+            <div class="t">Edit</div><div class="t">Agent <span class="chip red" style="font-size:8px; padding:0 4px">2</span></div><div class="t">History</div><div class="t on">Rent</div>
+          </div>
+          <div class="m-dockbody">
+            <div>
+              <div class="kicker" style="font-size:9.5px">Estimated weekly rent</div>
+              <div class="mono" style="font-size:24px; font-weight:700">$1,110<span style="font-size:12px; color:var(--faint)">/wk</span> <span style="color:var(--green); font-size:14px">+$210 · +23%</span></div>
+            </div>
+            <div>
+              <div class="m-meter"><div class="fill"></div><div class="tick" style="left:34%" title="baseline $900"></div></div>
+              <div style="display:flex; justify-content:space-between; font-size:9px; color:var(--faint)" class="mono"><span>baseline $900</span><span>comps $1,180–$1,450</span></div>
+            </div>
+            <div class="m-contrib">
+              <div class="row"><span>Balcony → living space</span><span class="amt zero">+$0</span></div>
+              <div class="row"><span>Garage → store + robe + ensuite</span><span class="amt">+$95</span></div>
+              <div class="row"><span>Kitchen / living / dining + pantry</span><span class="amt">+$60</span></div>
+              <div class="row"><span>BED 1 walk-in robe + ensuite</span><span class="amt">+$55</span></div>
+            </div>
+            <div class="banner amber" style="margin:0; font-size:10.5px">Rent estimate is out of date for the last 1 change — <strong>ask the agent to re-price</strong>.</div>
+          </div>
+        </div>
+      </div>
+      <div class="m-strip">
+        <div class="m-pills">
+          <span class="p">v00</span><span class="p star">v02</span><span class="p">v03</span><span class="p">v04</span><span class="p on">v05 · latest</span>
+        </div>
+        <div class="m-seg"><span class="s on">Proposed</span><span class="s">Changes v00 → v05</span></div>
+        <div class="footnote mono" style="font-size:9.5px">↓ PNG · ↓ SUMMARY.md · ☆ bookmark</div>
+      </div>
+    </div>
+    <p class="mock-note">The canvas component (<span class="mono">PlanCanvas.tsx</span>, 1,422 lines) is wrapped, not rewritten: zoom/fit is a viewport transform around the existing SVG; selection, drag, and delta rendering are untouched. Fixes F5, F6, F7, F8, F12.</p>
+
+    <h3 style="margin-top:28px">M2 · The register learns to speak — and stays a diff underneath</h3>
+    <p>Each change renders as a sentence with its rent contribution; the exact op diff sits one disclosure away.
+    Same data, two altitudes — resolving F9 without losing auditability.</p>
+    <div class="two-up">
+      <div class="card">
+        <div class="card-head"><h3>Today</h3><span class="meta">raw hunks</span></div>
+        <div class="card-body">
+          <div class="m-diff">
+            <div class="hunk"><span>@@ c02 · v05 · balcony: LIVING +$0/wk @@</span><span class="chip fill" style="font-size:8px">HUMAN</span></div>
+            <div class="del">− room&nbsp;&nbsp;&nbsp;balcony&nbsp;&nbsp;&nbsp;&nbsp;7.1 x 2.8m&nbsp;&nbsp;utility</div>
+            <div class="add">+ room&nbsp;&nbsp;&nbsp;living&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7.1 x 2.8m&nbsp;&nbsp;living</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Proposed</h3><span class="meta">sentence + disclosure</span></div>
+        <div class="card-body">
+          <div style="border:2px solid var(--ink); padding:8px 10px;">
+            <div style="display:flex; justify-content:space-between; gap:8px; align-items:baseline">
+              <strong style="font-size:13px">Balcony converted to living space</strong>
+              <span class="chip fill" style="font-size:8px">HUMAN · v05</span>
+            </div>
+            <div class="footnote">7.1 × 2.8 m brought inside the envelope · rent impact <span class="mono">+$0/wk</span> (pending re-price)</div>
+            <div class="footnote mono" style="margin-top:4px">▸ show exact ops (1)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px">M3 · Library sells the work</h3>
+    <p>Card grid with real plan thumbnails (endpoints already exist — F1), rent uplift as the headline, honest
+    status labels, and upload as a drop-zone with preview and progress (F2, F3). "Upload plan" nav merges into
+    the library's upload card (F4).</p>
+    <div class="mock" style="padding:14px">
+      <div class="m-lib">
+        <div class="m-card">
+          <div class="m-thumb" aria-hidden="true">
+            <span class="roomsketch" style="left:18%; top:18%; width:36%; height:36%"></span>
+            <span class="roomsketch" style="left:54%; top:18%; width:28%; height:64%"></span>
+            <span class="roomsketch" style="left:18%; top:54%; width:36%; height:28%"></span>
+          </div>
+          <div class="m-cardbody">
+            <div class="nm">231 Peats Ferry Road, Hornsby</div>
+            <div class="cfg">4 bed · 3 bath · 2 wc · v05</div>
+            <div><span class="mono" style="font-weight:700">$1,110/wk</span> <span class="mono" style="color:var(--green)">+$210</span></div>
+            <div style="margin-top:auto"><span class="m-btn">Open review</span></div>
+          </div>
+        </div>
+        <div class="m-card">
+          <div class="m-thumb">source image</div>
+          <div class="m-cardbody">
+            <div class="nm">Screenshot 2026-07-14</div>
+            <div class="cfg">draft — not yet reviewed</div>
+            <div><span class="chip amber">Finish setup — 2 steps left</span></div>
+            <div style="margin-top:auto; display:flex; gap:8px"><span class="m-btn">Continue</span><span class="m-btn ghost">Delete</span></div>
+          </div>
+        </div>
+        <div class="m-card">
+          <div class="m-drop" style="flex:1">
+            <div style="font-size:22px; color:var(--ink)">⤓</div>
+            <div style="text-transform:uppercase; letter-spacing:0.12em; font-weight:700; font-size:10.5px; color:var(--ink)">Drop a floor plan</div>
+            <div style="font-size:10.5px">PNG or JPG · or click to browse<br>We'll read the rooms and dimensions for you</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px">M4 · Ingest becomes a visible three-step wizard</h3>
+    <p>Same three actions as today, staged with a stepper and outcome-first copy (F13).</p>
+    <div class="mock" style="padding:14px">
+      <div class="m-steps">
+        <div class="st on"><div class="n">1</div><div class="t">Read the plan</div><div style="font-size:10px">We detect rooms, walls and dimensions from your image.</div></div>
+        <div class="st"><div class="n">2</div><div class="t">Check the rooms</div><div style="font-size:10px">Compare side-by-side with your image; fix anything we misread.</div></div>
+        <div class="st"><div class="n">3</div><div class="t">Set current rent</div><div style="font-size:10px">Tell us today's weekly rent — then start the review.</div></div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px">Language pass — plain-English primary, drafting flavour in kickers</h3>
+    <div class="tablewrap">
+      <table class="reg">
+        <thead><tr><th>Today (F3, F8, F13)</th><th>Proposed primary label</th><th>Where the term survives</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">UPLOAD → VISION INGEST</td><td>"Read my floor plan"</td><td>Ingest wizard kicker</td></tr>
+          <tr><td class="mono">needs ingest</td><td>"Finish setup — 2 steps left"</td><td>—</td></tr>
+          <tr><td class="mono">HEAD · v05</td><td>"v05 · latest"</td><td>Version pills keep <span class="mono">vNN</span></td></tr>
+          <tr><td class="mono">97 M² TO UNLOCK</td><td>"97 m² headroom" + tooltip: "the envelope allows 216 m²; the plan uses 119 m²"</td><td>Chip stays mono</td></tr>
+          <tr><td class="mono">⚑ rent not re-assessed</td><td>Amber banner: "Rent estimate is out of date — ask the agent to re-price"</td><td>Register footnote</td></tr>
+          <tr><td class="mono">DELTA</td><td>"Changes v00 → v05"</td><td>Register kicker</td></tr>
+          <tr><td class="mono">@@ c02 · v05 … @@</td><td>Sentence rows (M2)</td><td>"Show exact ops" disclosure</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="margin-top:28px">Guidance &amp; accessibility floor</h3>
+    <ul class="plain">
+      <li><strong>First-run coach</strong> (F10): one dismissible overlay on the review page tracing select → describe → add → send; stored per browser.</li>
+      <li><strong>Shortcut sheet</strong> (F11): <span class="mono">?</span> opens a card listing ⌘C/⌘V, ⌘Z, Delete, shift-click, Esc — sourced from the Feature Checks registry so it can't drift.</li>
+      <li><strong>Empty states</strong>: empty library → the upload card, full-width; empty change list → "Select a room on the plan to start".</li>
+      <li><strong>A11y</strong>: 12px minimum for interactive labels (hint strips move to tooltips/sheet), visible focus rings, <span class="mono">＋/−/△</span> glyphs beside delta colours (colour is never the only signal), <span class="mono">aria-live</span> on agent status, keyboard path for pill/tab navigation.</li>
+      <li><strong>Agent presence</strong>: the bottom-left status dot becomes a dock-tab state — AGENT tab shows a busy chip while working, and a toast lands when a new version arrives.</li>
+    </ul>
+  </div>
+
+  <!-- ============ S5 GOLDEN PATH ============ -->
+  <div class="section">
+    <div class="section-head"><span class="no">05</span><h2>The golden-path test — 231 Peats Ferry Rd, always run</h2></div>
+    <p>The user-specified canonical scenario becomes an automated regression that every phase (and every future
+    change) must keep green. It exercises the full product promise: <em>load a floor plan → maximise weekly rent
+    within the existing boundaries</em>.</p>
+
+    <pre class="mermaid">
+flowchart TD
+  UP["Upload 231-peats-ferry-rd/original.png&lt;br/&gt;(fresh plan, sandboxed)"] --> ING["Vision ingest drafts geometry"]
+  ING --> APPR["Approve @ $900/wk baseline&lt;br/&gt;3 bed · 1 bath · 1 wc · 95 m² internal / 216 m² envelope"]
+  APPR --> OPS["Apply canonical scope ops via the shared /edits pipeline:&lt;br/&gt;balcony → living · garage → store + robe + ensuite&lt;br/&gt;kitchen → kitchen/living/dining + pantry&lt;br/&gt;hall entry → BED 1 walk-in robe + ensuite&lt;br/&gt;front door relocated to lounge"]
+  OPS --> CHK{"Assertions"}
+  CHK -->|"all pass"| PASS["GREEN — phase may ship&lt;br/&gt;row visible in Feature Checks"]
+  CHK -->|"any fail"| FAIL["RED — phase blocked"]
+    </pre>
+
+    <div class="tablewrap">
+      <table class="reg">
+        <thead><tr><th style="width:34%">Step</th><th>Assert</th><th style="width:18%">Tier</th></tr></thead>
+        <tbody>
+          <tr><td>Upload <span class="mono">231-peats-ferry-rd/original.png</span> through the UI dropzone (Playwright)</td><td>Plan appears; ingest wizard reachable; no console errors</td><td><span class="chip">T1 · deterministic</span></td></tr>
+          <tr><td>Ingest → approve with baseline <span class="mono">$900/wk</span></td><td>v00 = 3 bed · 1 bath · 1 wc, <span class="mono">95 m²</span> internal, <span class="mono">216 m²</span> envelope</td><td><span class="chip">T1</span></td></tr>
+          <tr><td>Apply the five canonical changes via the same validated pipeline the UI uses</td><td>Every op accepted by the validator; envelope bytes identical before/after</td><td><span class="chip">T1</span></td></tr>
+          <tr><td>Read head version</td><td>Config = 4 bed · 3 bath · 2 wc; internal area &gt; 95 m²; garage/balcony rooms gone; BED 1 has robe + ensuite; entry door on lounge wall</td><td><span class="chip">T1</span></td></tr>
+          <tr><td>Delta view renders</td><td>Green adds / red removals / amber mods present; every room label + dims visible (locked canvas contract)</td><td><span class="chip">T1</span></td></tr>
+          <tr><td>Agent re-price with live comps</td><td>Proposed rent &gt; $900/wk baseline and ≥ 3 cited comps (seeded run: <span class="mono">$1,110/wk +$210</span>)</td><td><span class="chip amber">T2 · live web</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="banner" style="margin-top:14px">
+      <strong>Wiring.</strong> New <span class="mono">app/demo/e2e_golden_path.py</span> (same Python-Playwright harness as
+      <span class="mono">e2e_feature_matrix.py</span>, runs against a throwaway sandbox review, never touches real data) ·
+      Makefile target <span class="mono">make -C app golden</span>, included in <span class="mono">make -C app test</span> and
+      <span class="mono">smoke</span> · one row in the Feature Checks matrix ("Golden path — 231 PFR") via
+      <span class="mono">frontend/src/features.ts</span> so the result is visible in-app (F14). Tier 2 runs where web access
+      exists and is skipped — loudly, never silently — in offline CI.
+    </div>
+  </div>
+
+  <!-- ============ S6 PHASES ============ -->
+  <div class="section">
+    <div class="section-head"><span class="no">06</span><h2>Phased plan — each phase ships behind a green golden path</h2></div>
+
+    <div class="phase">
+      <div class="p-head"><span class="pn">P0</span><h3>Golden-path test first</h3><span class="chip fill">gate</span><span class="chip">~½ day</span></div>
+      <div class="p-body">
+        <div class="p-col"><div class="lbl">Files</div><ul><li><span class="mono">app/demo/e2e_golden_path.py</span> (new)</li><li><span class="mono">app/Makefile</span> (<span class="mono">golden</span> target)</li><li><span class="mono">frontend/src/features.ts</span> (+1 row)</li></ul></div>
+        <div class="p-col"><div class="lbl">Acceptance</div><ul><li>§5 table T1 green on the current UI before any restyle lands</li><li>Runs in <span class="mono">make test</span>; visible in Feature Checks</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="p-head"><span class="pn">P1</span><h3>Workspace frame — canvas-first review</h3><span class="chip red">F5</span><span class="chip">~2 days</span></div>
+      <div class="p-body">
+        <div class="p-col"><div class="lbl">Files</div><ul><li><span class="mono">pages/Review.tsx</span> (layout re-home)</li><li><span class="mono">styles.css</span> (workspace grid tokens/classes)</li><li><span class="mono">PlanCanvas.tsx</span> — wrapped in a zoom/fit viewport only; internals untouched</li></ul></div>
+        <div class="p-col"><div class="lbl">Acceptance</div><ul><li>Canvas fills viewport at every window size; zoom / fit / undo controls float on-canvas</li><li>No page-level vertical scroll on the review route</li><li>Golden path + all 20 feature checks green (gesture coordinates re-verified)</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="p-head"><span class="pn">P2</span><h3>Dock tabs + version strip</h3><span class="chip amber">F7 F10 F12</span><span class="chip">~2 days</span></div>
+      <div class="p-body">
+        <div class="p-col"><div class="lbl">Files</div><ul><li><span class="mono">components/Dock.tsx</span> (new; hosts Inspector / ChangeList / Register)</li><li><span class="mono">components/ContextBar.tsx</span> (split version pills from lens toggle)</li><li>Delta legend chip in canvas overlay</li></ul></div>
+        <div class="p-col"><div class="lbl">Acceptance</div><ul><li>EDIT / AGENT / HISTORY / RENT tabs; selection auto-raises EDIT; queued comments badge the AGENT tab</li><li>Delta view always shows the legend</li><li>Golden path green</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="p-head"><span class="pn">P3</span><h3>Rent story panel + readable register</h3><span class="chip red">F6</span><span class="chip amber">F8 F9</span><span class="chip">~2 days</span></div>
+      <div class="p-body">
+        <div class="p-col"><div class="lbl">Files</div><ul><li><span class="mono">components/RentPanel.tsx</span> (new; M2 meter + contributions from existing register/comps data)</li><li><span class="mono">components/Register.tsx</span> (sentence rows + ops disclosure)</li></ul></div>
+        <div class="p-col"><div class="lbl">Acceptance</div><ul><li>Baseline → proposed meter with comps range; per-change $ contributions; stale-rent amber banner</li><li>Every register row expands to its exact ops (audit parity)</li><li>Golden path green</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="p-head"><span class="pn">P4</span><h3>Library cards, dropzone upload, ingest stepper</h3><span class="chip red">F1 F2</span><span class="chip amber">F3 F13</span><span class="chip">~2 days</span></div>
+      <div class="p-body">
+        <div class="p-col"><div class="lbl">Files</div><ul><li><span class="mono">pages/Library.tsx</span> (cards + dropzone; nav "Upload plan" merges — F4)</li><li><span class="mono">pages/Ingest.tsx</span> (stepper + copy)</li><li>Optional backend: <span class="mono">DELETE /api/plans/{id}</span> for dead drafts (§7)</li></ul></div>
+        <div class="p-col"><div class="lbl">Acceptance</div><ul><li>Thumbnails from existing image/export endpoints; drag-drop with preview + progress</li><li>Draft cards say what's left and continue into the wizard</li><li>Golden path green — including the upload step through the new dropzone</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="p-head"><span class="pn">P5</span><h3>Language, guidance, accessibility</h3><span class="chip amber">F8 F10 F11</span><span class="chip">~1–2 days</span></div>
+      <div class="p-body">
+        <div class="p-col"><div class="lbl">Files</div><ul><li>Copy map applied across components (§4 table)</li><li>First-run coach, <span class="mono">?</span> shortcut sheet (fed from <span class="mono">features.ts</span>), empty states</li><li>Focus rings, aria-live agent status, delta glyphs</li></ul></div>
+        <div class="p-col"><div class="lbl">Acceptance</div><ul><li>No interactive label below 12px; keyboard walk of tabs/pills/dock</li><li>Coach shows once, dismissible, never for returning users</li><li>Golden path + full matrix green; skill file updated with any new tokens</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ S7 RISKS ============ -->
+  <div class="section">
+    <div class="section-head"><span class="no">07</span><h2>Risks &amp; failure modes</h2></div>
+    <div class="tablewrap">
+      <table class="reg">
+        <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          <tr><td><strong>E2E gesture coordinates break</strong> when the layout changes — the parity matrix drives real mouse gestures.</td><td>P0 lands the golden path <em>before</em> any layout change; each phase re-runs the full matrix and fixes selectors/coordinates in the same PR. That's why layout (P1) and dock (P2) are separate phases.</td></tr>
+          <tr><td><strong>PlanCanvas regressions</strong> — 1,422 lines of interaction code nobody wants to re-test by hand.</td><td>Never modify its internals in this plan; zoom/fit is an outer viewport transform. Canvas semantics are covered by existing checks.</td></tr>
+          <tr><td><strong>Thumbnails for un-reviewed drafts</strong> — no version exists to export.</td><td>Fall back to the uploaded source via <span class="mono">/api/plans/{id}/image</span> (exists today).</td></tr>
+          <tr><td><strong>Per-change rent contributions</strong> — register hunks currently carry <span class="mono">+$0/wk</span> until re-priced.</td><td>Show "pending re-price" honestly (amber), sum only priced changes; no invented numbers.</td></tr>
+          <tr><td><strong>Tier-2 rent assertion flakes offline</strong> (no live comps).</td><td>T2 is skipped-with-warning in offline runs; T1 geometry assertions always run.</td></tr>
+          <tr><td><strong>Draft deletion needs a new endpoint</strong> (only sandbox delete exists).</td><td>Optional small addition in P4; if declined, draft cards get "Continue" only and the plan still holds.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ S8 DECISIONS ============ -->
+  <div class="section">
+    <div class="section-head"><span class="no">08</span><h2>Decisions — queue your answers</h2></div>
+    <p class="footnote">Pick options below (selections stay local), press <strong>Queue answer</strong> per question, then use the review bar's <strong>Send</strong>. You can also annotate any screenshot, mockup, finding, or phase directly.</p>
+
+    <form class="q" data-lavish-question="rail" onsubmit="return queueAnswer(event, 'rail', 'Right-rail architecture')">
+      <div class="q-head"><span class="qn">Q1</span><h3>Review right rail</h3></div>
+      <div class="q-body">
+        <label class="opt"><input type="radio" name="rail" value="Tabbed dock (EDIT / AGENT / HISTORY / RENT)" checked>
+          <span><span class="t">Tabbed dock — recommended</span><br><span class="d">One panel at a time, selection auto-raises EDIT, badges carry state (M1). Most room for the canvas.</span></span></label>
+        <label class="opt"><input type="radio" name="rail" value="Accordion stack (all four collapsible, multiple open)">
+          <span><span class="t">Accordion stack</span><br><span class="d">Closer to today; several panels visible at once, but returns to vertical scrolling as panels open.</span></span></label>
+        <label class="opt"><input type="radio" name="rail" value="Two-column rail: Inspector always visible, second column tabs Agent/History/Rent">
+          <span><span class="t">Split rail</span><br><span class="d">Inspector permanently visible beside a tabbed column — costs ~640px of canvas width.</span></span></label>
+        <button class="queue" type="submit">Queue answer</button><span class="queued-note">✓ queued — press Send when done</span>
+      </div>
+    </form>
+
+    <form class="q" data-lavish-question="library" onsubmit="return queueAnswer(event, 'library', 'Library layout')">
+      <div class="q-head"><span class="qn">Q2</span><h3>Plan Library layout</h3></div>
+      <div class="q-body">
+        <label class="opt"><input type="radio" name="library" value="Card grid with plan thumbnails (M3)" checked>
+          <span><span class="t">Card grid with thumbnails — recommended</span><br><span class="d">The plan is the product; show it (M3). Scales to a handful of properties per screen.</span></span></label>
+        <label class="opt"><input type="radio" name="library" value="Keep the table, add a thumbnail column and status/action buttons">
+          <span><span class="t">Enhanced table</span><br><span class="d">Denser for many properties; smaller visual change, keeps column sorting trivially.</span></span></label>
+        <button class="queue" type="submit">Queue answer</button><span class="queued-note">✓ queued — press Send when done</span>
+      </div>
+    </form>
+
+    <form class="q" data-lavish-question="language" onsubmit="return queueAnswer(event, 'language', 'Language direction')">
+      <div class="q-head"><span class="qn">Q3</span><h3>Language</h3></div>
+      <div class="q-body">
+        <label class="opt"><input type="radio" name="language" value="Plain-English primary labels, drafting terms kept in kickers/disclosures (S4 copy map)" checked>
+          <span><span class="t">Plain-English primary — recommended</span><br><span class="d">Owners read "Read my floor plan"; the drafting flavour survives in kickers, mono chips and disclosures.</span></span></label>
+        <label class="opt"><input type="radio" name="language" value="Keep the current drafting/engineering vocabulary everywhere">
+          <span><span class="t">Keep current vocabulary</span><br><span class="d">No copy changes; restyle is layout/guidance only. F3/F8/F13 remain open.</span></span></label>
+        <button class="queue" type="submit">Queue answer</button><span class="queued-note">✓ queued — press Send when done</span>
+      </div>
+    </form>
+
+    <form class="q" data-lavish-question="scope" onsubmit="return queueAnswer(event, 'scope', 'Approved scope')">
+      <div class="q-head"><span class="qn">Q4</span><h3>Scope to approve now</h3></div>
+      <div class="q-body">
+        <label class="opt"><input type="radio" name="scope" value="P0 only — land the golden-path test, then re-review">
+          <span><span class="t">P0 only</span><br><span class="d">Just the 231-PFR regression gate; restyle waits.</span></span></label>
+        <label class="opt"><input type="radio" name="scope" value="P0–P2 first slice (test + workspace frame + dock), then checkpoint" checked>
+          <span><span class="t">P0–P2 first slice — recommended</span><br><span class="d">The structural half; rent panel and library follow after a checkpoint on the new frame.</span></span></label>
+        <label class="opt"><input type="radio" name="scope" value="Full P0–P5 as specified">
+          <span><span class="t">Full P0–P5</span><br><span class="d">~1.5–2 weeks of work approved in one go.</span></span></label>
+        <button class="queue" type="submit">Queue answer</button><span class="queued-note">✓ queued — press Send when done</span>
+      </div>
+    </form>
+  </div>
+
+  <div class="footnote" style="margin-top:48px; border-top:1px solid var(--grey); padding-top:12px">
+    Floor-Plan Studio · restyle proposal s07 · design source: the app's own Drafting Ink system
+    (<span class="mono">app/frontend/src/styles.css</span> + <span class="mono">.claude/skills/frontend-style</span>) ·
+    screenshots captured live 2026-07-15 · concept proposals — not architectural, planning, or financial advice.
+  </div>
+</div>
+
+<script>
+  function queueAnswer(event, name, title) {
+    event.preventDefault();
+    var form = event.currentTarget;
+    var choice = new FormData(form).get(name);
+    if (!choice) return false;
+    if (window.lavish && window.lavish.queuePrompt) {
+      window.lavish.queuePrompt(title + ': ' + choice, {
+        tag: 'choice',
+        text: title + ': ' + choice,
+        element: form,
+        queueKey: name,
+        data: { question: name, answer: choice }
+      });
+      form.classList.add('done');
+    } else {
+      form.classList.add('done');
+      var note = form.querySelector('.queued-note');
+      if (note) note.textContent = '✓ noted locally (open via lavish-axi to send)';
+    }
+    return false;
+  }
+</script>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) {
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "#000";
+    paint.fillStyle = color;
+    paint.fillRect(0, 0, 1, 1);
+    return paint.getImageData(0, 0, 1, 1).data;
+  }
+  function compositeRgba(foreground, background) {
+    const fa = foreground[3] / 255, ba = background[3] / 255;
+    const a = fa + ba * (1 - fa);
+    if (a === 0) return [0, 0, 0, 0];
+    return [
+      (foreground[0] * fa + background[0] * ba * (1 - fa)) / a,
+      (foreground[1] * fa + background[1] * ba * (1 - fa)) / a,
+      (foreground[2] * fa + background[2] * ba * (1 - fa)) / a,
+      a * 255,
+    ];
+  }
+  function pageIsDark() {
+    const root = document.documentElement;
+    const rootBackground = toRgba(getComputedStyle(root).backgroundColor);
+    const bodyBackground = document.body ? toRgba(getComputedStyle(document.body).backgroundColor) : [0, 0, 0, 0];
+    const [r, g, b, a] = compositeRgba(bodyBackground, rootBackground);
+    if (a > 0) return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+    const colorScheme = getComputedStyle(root).colorScheme;
+    if (colorScheme.includes("dark") && !colorScheme.includes("light")) return true;
+    if (colorScheme.includes("light") && !colorScheme.includes("dark")) return false;
+    return darkQuery.matches;
+  }
+  const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+  let applied; let rendering = false; let queued = false;
+  function queueRender() { queued = true; if (rendering) return; void render(); }
+  async function render() {
+    rendering = true;
+    try {
+      while (queued) {
+        queued = false;
+        const theme = pageIsDark() ? "dark" : "default";
+        if (theme === applied) continue;
+        mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+        for (const { el, src } of diagrams) { el.removeAttribute("data-processed"); el.textContent = src; }
+        try { await mermaid.run({ nodes: diagrams.map((d) => d.el) }); }
+        catch (error) { console.error("Mermaid diagram render failed:", error); return; }
+        applied = theme;
+      }
+    } finally {
+      rendering = false;
+      if (queued) queueRender();
+    }
+  }
+  if (document.readyState === "complete") queueRender();
+  else window.addEventListener("load", queueRender, { once: true });
+  const themeObserver = new MutationObserver(queueRender);
+  for (const el of [document.documentElement, document.body]) {
+    if (!el) continue;
+    themeObserver.observe(el, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+  }
+  document.addEventListener("change", queueRender, true);
+  document.addEventListener("transitionend", ({ propertyName }) => {
+    if (propertyName === "background-color") queueRender();
+  }, true);
+  darkQuery.addEventListener("change", queueRender);
+</script>
+</body>
+</html>
