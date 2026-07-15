@@ -25,10 +25,10 @@ export function envelopeForLevel(geo: PlanGeometry, levelId: string): [number, n
   const envelopes = geo.meta['envelopes'] as Record<string, number[]> | undefined;
   const env = envelopes?.[levelId];
   if (env) return [env[0], env[1], env[2], env[3]];
-  const rooms = geo.rooms.filter((r) => roomLevel(r) === levelId);
-  if (rooms.length === 0) return (geo.meta['envelope'] as [number, number, number, number]) ?? bbox(geo.rooms);
   if (planLevels(geo).length === 1 && geo.meta['envelope'])
     return geo.meta['envelope'] as [number, number, number, number];
+  const rooms = geo.rooms.filter((r) => roomLevel(r) === levelId);
+  if (rooms.length === 0) return [0, 0, 0, 0]; // roomless level: degenerate, never the whole plan
   return bbox(rooms);
 }
 
@@ -272,6 +272,32 @@ export function deriveWalls(rooms: Room[], prev: Wall[] = []): Wall[] {
     if (carried) w.openings = carried.map((o) => ({ ...o }));
   }
   return walls;
+}
+
+/** Find the wall best matching an absolute span; returns {wall, t0, t1}. Mirrors
+ * plan_core.walls.locate_wall — used to re-home an opening onto re-derived walls by
+ * position (not wall id), so a swap/topology change keeps doors where the server will. */
+export function locateWall(
+  walls: Wall[],
+  vertical: boolean,
+  coord: number,
+  lo: number,
+  hi: number,
+  coordTol = 0.45,
+): { wall: Wall; t0: number; t1: number } | null {
+  let best: { olap: number; wall: Wall } | null = null;
+  for (const w of walls) {
+    if (wallIsVertical(w) !== vertical || Math.abs(wallCoord(w) - coord) > coordTol) continue;
+    const [wlo, whi] = wallSpan(w);
+    const olap = Math.min(hi, whi) - Math.max(lo, wlo);
+    if (olap > 0.05 && (best === null || olap > best.olap)) best = { olap, wall: w };
+  }
+  if (best === null) return null;
+  const w = best.wall;
+  const [wlo, whi] = wallSpan(w);
+  const t0 = Math.max(0, Math.min(1, absToT(w, Math.max(lo, wlo))));
+  const t1 = Math.max(0, Math.min(1, absToT(w, Math.min(hi, whi))));
+  return t1 - t0 > 1e-6 ? { wall: w, t0, t1 } : null;
 }
 
 // ---- clear dimensions (the ONE dimension standard — walls subtracted) ----

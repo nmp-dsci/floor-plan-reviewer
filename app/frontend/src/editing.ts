@@ -5,7 +5,51 @@
 // no preview id ever reaches the server. One Apply commits the batch as one version.
 
 import type { Fixture, OpeningType, PlanGeometry, Room, Wall } from './types';
-import { deriveWalls, snapM, wallIsVertical } from './geometry';
+import {
+  deriveWalls,
+  locateWall,
+  snapM,
+  tToAbs,
+  wallCoord,
+  wallIsVertical,
+} from './geometry';
+
+// An existing opening captured by absolute position (not wall id), so it can be re-homed
+// onto the re-derived walls the way the server (plan_core.ops.apply_ops) does.
+interface AbsOpening {
+  vertical: boolean;
+  coord: number;
+  lo: number;
+  hi: number;
+  type: OpeningType;
+  id: string;
+}
+
+function snapshotOpenings(walls: Wall[]): AbsOpening[] {
+  const out: AbsOpening[] = [];
+  for (const w of walls) {
+    for (const o of w.openings) {
+      out.push({
+        vertical: wallIsVertical(w),
+        coord: wallCoord(w),
+        lo: tToAbs(w, o.t0),
+        hi: tToAbs(w, o.t1),
+        type: o.type,
+        id: o.id,
+      });
+    }
+  }
+  return out;
+}
+
+function rehomeOpenings(walls: Wall[], snapshot: AbsOpening[]): void {
+  for (const a of snapshot) {
+    const hit = locateWall(walls, a.vertical, a.coord, a.lo, a.hi);
+    if (!hit) continue;
+    if (hit.wall.openings.some((o) => o.id === a.id)) continue;
+    hit.wall.openings.push({ id: a.id, type: a.type, t0: hit.t0, t1: hit.t1 });
+  }
+}
 
 // ops that change room rectangles → walls must be re-derived so the preview shows them moved
 const ROOM_GEOMETRY_OPS = new Set(['add_room', 'split_room', 'merge_rooms', 'remove_room', 'resize_room']);
@@ -208,9 +252,14 @@ export function applyOpsPreview(geo: PlanGeometry, entries: PendingEntry[]): Pla
         break;
     }
   }
-  // re-derive walls (carrying openings) so wall moves / new rooms show in the preview
+  // re-derive walls so wall moves / new rooms show in the preview. Existing openings are
+  // re-homed by ABSOLUTE POSITION (like the server), not carried by wall id — a swap or
+  // other topology-changing edit renames walls, and carry-by-id would silently drop the
+  // door even though the server keeps it, making the amber preview lie about the commit.
   if (entries.some((e) => ROOM_GEOMETRY_OPS.has(e.op.op))) {
-    g.walls = deriveWalls(g.rooms, g.walls);
+    const snapshot = snapshotOpenings(g.walls);
+    g.walls = deriveWalls(g.rooms);
+    rehomeOpenings(g.walls, snapshot);
   }
   // second pass: openings now land on the (re-derived) walls the user actually clicked
   for (const { pid, op } of openingEntries) {

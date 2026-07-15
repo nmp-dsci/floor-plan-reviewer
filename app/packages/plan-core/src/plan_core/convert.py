@@ -15,6 +15,7 @@ from plan_core.schema import (
     Wall,
     level_name,
 )
+from plan_core.validate import MIN_NESTED, MIN_ROOM
 from plan_core.walls import derive_walls, locate_wall
 
 # Vision extraction rounds room rects to the pixel grid, so adjacent rooms often
@@ -23,7 +24,6 @@ from plan_core.walls import derive_walls, locate_wall
 # it never trips the validator. Bigger overlaps are left for the validator to warn on.
 HEAL_TOL = 0.2
 _HEAL_OVERLAP_MIN = 0.05
-_HEAL_MIN_SIDE = 0.45
 
 _KIND_RULES: list[tuple[str, Kind]] = [
     ("bed", "bedroom"),
@@ -84,8 +84,10 @@ def _heal_overlaps(rooms: list[Room]) -> None:
                 else:  # vertical penetration → trim b along y
                     nx, nw = b.x, b.w
                     ny, nh = (b.y, b.h - oy) if b.y <= a.y else (b.y + oy, b.h - oy)
-                if min(nw, nh) < _HEAL_MIN_SIDE:
-                    continue  # would go degenerate — leave it for the validator to warn on
+                min_side = MIN_NESTED if (b.z or b.kind == "storage") else MIN_ROOM
+                if min(nw, nh) < min_side:
+                    continue  # below the validator's minimum — leave the modest overlap
+                    # as a warning rather than heal into a blocking "too small" error
                 b.x, b.y, b.w, b.h = nx, ny, nw, nh
 
 

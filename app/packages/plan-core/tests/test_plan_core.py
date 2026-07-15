@@ -376,6 +376,23 @@ def test_heal_does_not_cross_levels() -> None:
     assert geo.room("garage").w == 4  # untouched — different level, not a real overlap
 
 
+def test_heal_leaves_overlap_when_shrink_would_go_below_room_minimum() -> None:
+    # a narrow non-storage WC overlapping a neighbour by a sliver: healing it to clear the
+    # overlap would shrink it under the validator's 0.7 m minimum, turning an approvable
+    # modest-overlap warning into a blocking "too small" error at the non-interactive ingest.
+    draft = {
+        "rooms": [
+            {"name": "BED 1", "x": 0, "y": 0, "w": 4, "h": 3},
+            {"name": "WC", "x": 3.8, "y": 0, "w": 0.85, "h": 3},
+        ]
+    }
+    geo = convert_v1(draft)
+    assert geo.room("wc").w == 0.85  # left unhealed — shrinking to 0.65 m is below MIN_ROOM
+    errors, warnings = validate(geo)
+    assert not any("too small" in e for e in errors), errors
+    assert any("overlap" in w for w in warnings)
+
+
 def test_phantom_level_dropped_and_area_not_inflated() -> None:
     # the draft declares an upper storey but tags no room to it — that phantom level
     # must not become a tab nor inflate the summed per-level footprint.
