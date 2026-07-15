@@ -251,7 +251,9 @@ class PlanGeometry(BaseModel):
         ids = self.level_ids()
         if len(ids) == 1 and self.meta.get("envelope"):
             return self.envelope()
-        rooms = self.rooms_on(level_id) or self.rooms
+        rooms = self.rooms_on(level_id)
+        if not rooms:
+            return (0.0, 0.0, 0.0, 0.0)  # roomless level: degenerate, never the whole plan
         return (
             min(r.x for r in rooms),
             min(r.y for r in rooms),

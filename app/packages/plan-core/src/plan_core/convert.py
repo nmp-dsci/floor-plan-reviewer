@@ -64,23 +64,29 @@ def slugify(name: str) -> str:
 
 def _heal_overlaps(rooms: list[Room]) -> None:
     """Shrink slivers where the vision model rounded adjacent rooms into each other.
-    Shrinking only reduces a room's extent, so it can never create a new overlap."""
-    z0 = [r for r in rooms if r.z == 0]
-    for i, a in enumerate(z0):
-        for b in z0[i + 1 :]:  # adjust the later room; earlier rooms anchor
-            ox = min(a.x2, b.x2) - max(a.x, b.x)
-            oy = min(a.y2, b.y2) - max(a.y, b.y)
-            if ox <= _HEAL_OVERLAP_MIN or oy <= _HEAL_OVERLAP_MIN or min(ox, oy) > HEAL_TOL:
-                continue
-            if ox <= oy:  # horizontal penetration → trim b along x
-                nx, nw = (b.x, b.w - ox) if b.x <= a.x else (b.x + ox, b.w - ox)
-                ny, nh = b.y, b.h
-            else:  # vertical penetration → trim b along y
-                nx, nw = b.x, b.w
-                ny, nh = (b.y, b.h - oy) if b.y <= a.y else (b.y + oy, b.h - oy)
-            if min(nw, nh) < _HEAL_MIN_SIDE:
-                continue  # would go degenerate — leave it for the validator to warn on
-            b.x, b.y, b.w, b.h = nx, ny, nw, nh
+    Shrinking only reduces a room's extent, so it can never create a new overlap.
+    Scoped per level like derive_walls — levels share a coordinate origin, so rooms
+    on different structures must never be compared or one gets falsely shrunk."""
+    by_level: dict[str, list[Room]] = {}
+    for r in rooms:
+        if r.z == 0:
+            by_level.setdefault(r.level, []).append(r)
+    for z0 in by_level.values():
+        for i, a in enumerate(z0):
+            for b in z0[i + 1 :]:  # adjust the later room; earlier rooms anchor
+                ox = min(a.x2, b.x2) - max(a.x, b.x)
+                oy = min(a.y2, b.y2) - max(a.y, b.y)
+                if ox <= _HEAL_OVERLAP_MIN or oy <= _HEAL_OVERLAP_MIN or min(ox, oy) > HEAL_TOL:
+                    continue
+                if ox <= oy:  # horizontal penetration → trim b along x
+                    nx, nw = (b.x, b.w - ox) if b.x <= a.x else (b.x + ox, b.w - ox)
+                    ny, nh = b.y, b.h
+                else:  # vertical penetration → trim b along y
+                    nx, nw = b.x, b.w
+                    ny, nh = (b.y, b.h - oy) if b.y <= a.y else (b.y + oy, b.h - oy)
+                if min(nw, nh) < _HEAL_MIN_SIDE:
+                    continue  # would go degenerate — leave it for the validator to warn on
+                b.x, b.y, b.w, b.h = nx, ny, nw, nh
 
 
 def _level_order(rooms: list[Room]) -> list[str]:
@@ -155,13 +161,19 @@ def convert_v1(data: dict[str, Any]) -> PlanGeometry:
         for f in data.get("fixtures", [])
     ]
 
-    # ordered levels: honour the draft's list, then append any room level it missed
+    # ordered levels: honour the draft's list, then append any room level it missed.
+    # Only levels that actually carry rooms are kept — a phantom level (declared in the
+    # draft but tagged on no room) has no envelope, so it would inflate total_area and
+    # draw an empty panel if it reached meta["levels"].
     order = _level_order(rooms)
+    room_levels = set(order)
     draft_levels = data.get("levels") or []
     levels: list[dict[str, str]] = []
     seen: set[str] = set()
     for lvl in draft_levels:
         lid = str(lvl["id"])
+        if lid not in room_levels or lid in seen:
+            continue
         levels.append({"id": lid, "name": str(lvl.get("name") or level_name(lid))})
         seen.add(lid)
     for lid in order:

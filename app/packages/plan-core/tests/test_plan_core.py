@@ -362,6 +362,56 @@ def test_convert_heals_sliver_overlaps() -> None:
     assert not any("overlap" in e for e in errors), errors
 
 
+def test_heal_does_not_cross_levels() -> None:
+    # a garage drawn in its own origin overlaps the house's coords by a sliver;
+    # cross-level healing would falsely shrink it — per-level scoping must not.
+    draft = {
+        "levels": [{"id": "level-1"}, {"id": "garage"}],
+        "rooms": [
+            {"name": "LOUNGE", "x": 0, "y": 0, "w": 4, "h": 4, "level": "level-1"},
+            {"name": "GARAGE", "x": 3.9, "y": 0, "w": 4, "h": 4, "level": "garage"},
+        ],
+    }
+    geo = convert_v1(draft)
+    assert geo.room("garage").w == 4  # untouched — different level, not a real overlap
+
+
+def test_phantom_level_dropped_and_area_not_inflated() -> None:
+    # the draft declares an upper storey but tags no room to it — that phantom level
+    # must not become a tab nor inflate the summed per-level footprint.
+    draft = {
+        "levels": [
+            {"id": "level-1", "name": "Level 1"},
+            {"id": "level-2", "name": "Level 2"},  # phantom: no rooms
+        ],
+        "rooms": [
+            {"name": "LOUNGE", "x": 0, "y": 0, "w": 4, "h": 4, "level": "level-1"},
+            {"name": "BED 1", "x": 4.1, "y": 0, "w": 3, "h": 4, "level": "level-1"},
+        ],
+    }
+    geo = convert_v1(draft)
+    assert [lvl["id"] for lvl in geo.levels()] == ["level-1"]
+    assert geo.level_ids() == ["level-1"]
+    assert "level-2" not in geo.meta["envelopes"]
+    x0, y0, x1, y1 = geo.envelope_for("level-1")
+    assert abs(geo.total_area() - (x1 - x0) * (y1 - y0)) < 1e-6
+
+
+def test_envelope_for_roomless_level_is_degenerate() -> None:
+    from plan_core import PlanGeometry, Room
+
+    # a roomless level in a multi-level plan must return a zero bbox, never the whole plan
+    geo = PlanGeometry(
+        rooms=[
+            Room(id="a", name="A", x=0, y=0, w=4, h=4, level="level-1"),
+            Room(id="b", name="B", x=0, y=0, w=6, h=6, level="garage"),
+        ],
+        meta={"levels": [{"id": "level-1"}, {"id": "garage"}, {"id": "phantom"}]},
+    )
+    assert geo.envelope_for("phantom") == (0.0, 0.0, 0.0, 0.0)
+    assert abs(geo.total_area() - (16 + 36)) < 1e-6
+
+
 def test_modest_overlap_warns_gross_overlap_errors() -> None:
     from plan_core import PlanGeometry, Room
 
