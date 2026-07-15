@@ -12,7 +12,17 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, TypeAdapter
 
 from plan_core.convert import kind_for, slugify
-from plan_core.schema import Fixture, Kind, Opening, OpeningType, PlanGeometry, Room, fixture_slug
+from plan_core.schema import (
+    DEFAULT_LEVEL,
+    Fixture,
+    Kind,
+    Opening,
+    OpeningType,
+    PlanGeometry,
+    Room,
+    Wall,
+    fixture_slug,
+)
 from plan_core.walls import derive_walls, locate_wall
 
 
@@ -161,6 +171,7 @@ class _AbsOpening(BaseModel):
     hi: float
     type: OpeningType
     id: str
+    level: str  # host structure — openings only re-home onto same-level walls
 
 
 class OpsResult(BaseModel):
@@ -169,6 +180,8 @@ class OpsResult(BaseModel):
 
 
 def _snapshot_openings(geo: PlanGeometry) -> list[_AbsOpening]:
+    # a wall's level is the level of its room (wall.a is always a real room id)
+    room_level = {r.id: r.level for r in geo.rooms}
     out: list[_AbsOpening] = []
     for w in geo.walls:
         for o in w.openings:
@@ -180,6 +193,7 @@ def _snapshot_openings(geo: PlanGeometry) -> list[_AbsOpening]:
                     hi=w.t_to_abs(o.t1),
                     type=o.type,
                     id=o.id,
+                    level=room_level.get(w.a, DEFAULT_LEVEL),
                 )
             )
     return out
@@ -388,6 +402,12 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
     # rebuild walls from the mutated rooms, then place the deferred new openings onto the
     # final walls (their wall ids/positions are only correct here), then re-home everything
     g.walls = derive_walls(g.rooms)
+    # scope re-homing per level like convert_v1/derive_walls: detached structures share a
+    # coord origin, so an opening must never re-home onto a different level's wall
+    room_level = {r.id: r.level for r in g.rooms}
+    walls_by_level: dict[str, list[Wall]] = {}
+    for wl in g.walls:
+        walls_by_level.setdefault(room_level.get(wl.a, DEFAULT_LEVEL), []).append(wl)
     for wall_id, t0, t1, typ, oid in deferred_openings:
         w = next((wl for wl in g.walls if wl.id == wall_id), None)
         if w is None:
@@ -401,10 +421,17 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
                 hi=w.t_to_abs(t1),
                 type=typ,
                 id=oid,
+                level=room_level.get(w.a, DEFAULT_LEVEL),
             )
         )
     for a in abs_openings:
-        hit = locate_wall(g.walls, vertical=a.vertical, coord=a.coord, lo=a.lo, hi=a.hi)
+        hit = locate_wall(
+            walls_by_level.get(a.level, []),
+            vertical=a.vertical,
+            coord=a.coord,
+            lo=a.lo,
+            hi=a.hi,
+        )
         if hit is None:
             warnings.append(f"opening {a.id} ({a.type}) no longer sits on any wall; dropped")
             continue

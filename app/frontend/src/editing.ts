@@ -6,6 +6,7 @@
 
 import type { Fixture, OpeningType, PlanGeometry, Room, Wall } from './types';
 import {
+  DEFAULT_LEVEL,
   deriveWalls,
   locateWall,
   snapM,
@@ -15,7 +16,8 @@ import {
 } from './geometry';
 
 // An existing opening captured by absolute position (not wall id), so it can be re-homed
-// onto the re-derived walls the way the server (plan_core.ops.apply_ops) does.
+// onto the re-derived walls the way the server (plan_core.ops.apply_ops) does. `level` is
+// the host structure — an opening only re-homes onto same-level walls.
 interface AbsOpening {
   vertical: boolean;
   coord: number;
@@ -23,9 +25,10 @@ interface AbsOpening {
   hi: number;
   type: OpeningType;
   id: string;
+  level: string;
 }
 
-function snapshotOpenings(walls: Wall[]): AbsOpening[] {
+function snapshotOpenings(walls: Wall[], roomLevel: Map<string, string>): AbsOpening[] {
   const out: AbsOpening[] = [];
   for (const w of walls) {
     for (const o of w.openings) {
@@ -36,15 +39,25 @@ function snapshotOpenings(walls: Wall[]): AbsOpening[] {
         hi: tToAbs(w, o.t1),
         type: o.type,
         id: o.id,
+        level: roomLevel.get(w.a) ?? DEFAULT_LEVEL,
       });
     }
   }
   return out;
 }
 
-function rehomeOpenings(walls: Wall[], snapshot: AbsOpening[]): void {
+function rehomeOpenings(walls: Wall[], snapshot: AbsOpening[], roomLevel: Map<string, string>): void {
+  // scope per level like the server (plan_core.ops): detached structures share a coord
+  // origin, so an opening must never re-home onto a different level's wall
+  const wallsByLevel = new Map<string, Wall[]>();
+  for (const w of walls) {
+    const lv = roomLevel.get(w.a) ?? DEFAULT_LEVEL;
+    const arr = wallsByLevel.get(lv);
+    if (arr) arr.push(w);
+    else wallsByLevel.set(lv, [w]);
+  }
   for (const a of snapshot) {
-    const hit = locateWall(walls, a.vertical, a.coord, a.lo, a.hi);
+    const hit = locateWall(wallsByLevel.get(a.level) ?? [], a.vertical, a.coord, a.lo, a.hi);
     if (!hit) continue;
     if (hit.wall.openings.some((o) => o.id === a.id)) continue;
     hit.wall.openings.push({ id: a.id, type: a.type, t0: hit.t0, t1: hit.t1 });
@@ -257,9 +270,13 @@ export function applyOpsPreview(geo: PlanGeometry, entries: PendingEntry[]): Pla
   // other topology-changing edit renames walls, and carry-by-id would silently drop the
   // door even though the server keeps it, making the amber preview lie about the commit.
   if (entries.some((e) => ROOM_GEOMETRY_OPS.has(e.op.op))) {
-    const snapshot = snapshotOpenings(g.walls);
+    // level per room: original rooms for the snapshot (old walls may host a removed room),
+    // mutated rooms for the re-derived walls
+    const snapLevel = new Map(geo.rooms.map((r) => [r.id, r.level ?? DEFAULT_LEVEL]));
+    const snapshot = snapshotOpenings(g.walls, snapLevel);
     g.walls = deriveWalls(g.rooms);
-    rehomeOpenings(g.walls, snapshot);
+    const finalLevel = new Map(g.rooms.map((r) => [r.id, r.level ?? DEFAULT_LEVEL]));
+    rehomeOpenings(g.walls, snapshot, finalLevel);
   }
   // second pass: openings now land on the (re-derived) walls the user actually clicked
   for (const { pid, op } of openingEntries) {
