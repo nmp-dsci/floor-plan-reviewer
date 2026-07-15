@@ -1,9 +1,9 @@
 """The ops loop: comments + geometry → typed plan-core operations, validated with bounce-back.
 
-Model is config-swappable per spec decision D5: DeepSeek (`deepseek:deepseek-chat`)
-is the cost default; any pydantic-ai model string works (e.g. `anthropic:claude-opus-4-8`).
-The agent NEVER edits pixels or SVG — it emits plan-core ops that are applied and
-validated here; validator errors are fed back for up to 2 retries.
+All LLM calls run through the Claude Agent SDK (see `plan_agent.llm`) on the operator's
+Claude subscription (spec decision D5); the model defaults to `claude-opus-4-8`, overridable
+via `PLAN_AGENT_MODEL`. The agent NEVER edits pixels or SVG — it emits plan-core ops that
+are applied and validated here; validator errors are fed back for up to 2 retries.
 """
 
 from __future__ import annotations

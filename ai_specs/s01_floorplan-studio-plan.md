@@ -54,6 +54,11 @@ between junctions), then addressable. All coordinates metres; axis-aligned only 
 { "id": "q1", "targets": [ ... ], "text": "open this wall — servery window", "status": "queued" }
 ```
 
+Every room and fixture also carries a `level` id (default `level-1`) tagging the storey or
+detached structure it belongs to; `meta.levels` holds the ordered `[{id, name}]` and
+`meta.envelopes` the pinned per-level footprint. A single-building plan is just one level. See
+AGENTS.md "Multi-level plans" for how walls, validation, and footprint run per level.
+
 **Ids are stable across versions** — agent ops reuse ids for modifications, mint new ones for
 additions. That makes diffing set comparison: `add` / `remove` / `modify` per room/wall/opening.
 
@@ -149,6 +154,8 @@ floor-plan-reviewer/
 2. **Wall-chunk UX** → whole-segment default; chunks only via drag handles; snapping; fat strokes.
 3. **Geometry corruption** → all agent edits through plan-core validation with bounce-back;
    immutable versions; head-only writes.
-4. **Rect-only model** → no diagonal/curved walls, single storey per plan object (multi-storey =
-   one object per level, later).
+4. **Rect-only model** → no diagonal/curved walls (v1 constraint holds). Multi-storey and detached
+   structures are now supported within one plan object: each room/fixture carries a `level` id and
+   each level renders/validates/derives walls in its own coordinate origin (delivered 2026-07-15;
+   see AGENTS.md "Multi-level plans").
 5. **Two renderers, one look** → plan-core owns shared style constants.

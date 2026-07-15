@@ -66,8 +66,8 @@ font, or spacing value that isn't a token. Current set:
   `geometry.ts`). Fixtures: 2px ink outline, no fill. Canvas background is always paper.
 - Selection: red — dashed rect overlay for rooms/fixtures, 9px red stroke + white-filled
   red-ringed drag handles for wall chunks.
-- Delta view: green solid = added, red dashed = removed, amber dotted = modified. Never
-  reuse these three for anything else on the canvas.
+- Delta view: green solid = added, red dashed = removed, amber (dotted outline + light amber
+  fill) = modified. Never reuse these three for anything else on the canvas.
 - Room labels: uppercase name + mono dims in `--faint`, **always visible on every room** — never
   auto-hidden; shrink to a legible floor on small rooms instead of dropping the dims.
 
