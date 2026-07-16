@@ -107,6 +107,18 @@ def _job_running(db, review_id: str) -> bool:
     )
 
 
+def _sandbox_seed_plan_id(db) -> str | None:
+    """The earliest non-sandbox plan with a review + v0 — the same plan
+    create_sandbox() clones. Golden-path E2E + Feature Checks depend on it existing."""
+    for plan in db.execute(
+        select(Plan).where(Plan.slug.not_like(f"{SANDBOX_PREFIX}%")).order_by(Plan.created_at)
+    ).scalars():
+        rev = db.execute(select(Review).where(Review.plan_id == plan.id)).scalars().first()
+        if rev and _versions(db, rev.id):
+            return plan.id
+    return None
+
+
 def _prune_unsaved(db, review_id: str, keep_n: int) -> list[int]:
     """Keep the original (v0), the new head, and any bookmarked versions; drop the rest.
     This is what stops every incremental edit from piling up — history stays lean."""
@@ -506,8 +518,9 @@ def plan_image(plan_id: str) -> FileResponse:
 
 @app.delete("/api/plans/{plan_id}")
 def delete_plan(plan_id: str) -> dict[str, bool]:
-    """Remove a plan and everything under it (review, versions, jobs, uploaded
-    image). Used to clear dead drafts from the library. Only files that live under
+    """Remove a dead-draft plan and everything under it (review, versions, jobs,
+    uploaded image). The seed plan that create_sandbox() clones from, and any plan
+    with a queued/running agent job, are refused. Only files that live under
     STORAGE_DIR are unlinked, so a seed image can never be removed."""
     from pathlib import Path
 
@@ -517,7 +530,12 @@ def delete_plan(plan_id: str) -> dict[str, bool]:
             raise HTTPException(404, "plan not found")
         if plan.slug.startswith(SANDBOX_PREFIX):
             raise HTTPException(403, "sandbox plans are managed automatically")
-        for review in db.execute(select(Review).where(Review.plan_id == plan_id)).scalars():
+        if plan.id == _sandbox_seed_plan_id(db):
+            raise HTTPException(409, "seed plan cannot be deleted")
+        reviews = db.execute(select(Review).where(Review.plan_id == plan_id)).scalars().all()
+        if any(_job_running(db, review.id) for review in reviews):
+            raise HTTPException(409, "plan has a running job")
+        for review in reviews:
             for v in _versions(db, review.id):
                 db.delete(v)
             for job in db.execute(select(Job).where(Job.review_id == review.id)).scalars():
