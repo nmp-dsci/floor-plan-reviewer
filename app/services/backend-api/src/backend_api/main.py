@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Any
 
 import httpx
@@ -547,10 +547,8 @@ def delete_plan(plan_id: str) -> dict[str, bool]:
         db.delete(plan)
         db.commit()
     if image_path and image_path.startswith(str(STORAGE_DIR)):
-        try:
+        with suppress(OSError):
             Path(image_path).unlink(missing_ok=True)
-        except OSError:
-            pass
     return {"deleted": True}
 
 

@@ -144,8 +144,20 @@ def run_t1(page: Page) -> None:
                 review_id,
                 0,
                 [
-                    {"op": "set_kind", "room_id": "garage", "name": "BED 4", "kind": "bedroom", "fill": "white"},
-                    {"op": "set_kind", "room_id": "balcony", "name": "LIVING", "kind": "living", "fill": "white"},
+                    {
+                        "op": "set_kind",
+                        "room_id": "garage",
+                        "name": "BED 4",
+                        "kind": "bedroom",
+                        "fill": "white",
+                    },
+                    {
+                        "op": "set_kind",
+                        "room_id": "balcony",
+                        "name": "LIVING",
+                        "kind": "living",
+                        "fill": "white",
+                    },
                 ],
                 "Garage → Bed 4 · balcony → living",
             )
@@ -167,7 +179,15 @@ def run_t1(page: Page) -> None:
             edits(
                 review_id,
                 n,
-                [{"op": "split_room", "room_id": "garage", "axis": "y", "at": at, "new_name": "ENSUITE"}],
+                [
+                    {
+                        "op": "split_room",
+                        "room_id": "garage",
+                        "axis": "y",
+                        "at": at,
+                        "new_name": "ENSUITE",
+                    }
+                ],
                 "Carve ensuite off Bed 4",
             )
             n2, g2 = head_geo(review_id)
@@ -192,7 +212,15 @@ def run_t1(page: Page) -> None:
             edits(
                 review_id,
                 n,
-                [{"op": "split_room", "room_id": "bed-1", "axis": "x", "at": at, "new_name": "WIR"}],
+                [
+                    {
+                        "op": "split_room",
+                        "room_id": "bed-1",
+                        "axis": "x",
+                        "at": at,
+                        "new_name": "WIR",
+                    }
+                ],
                 "BED 1 walk-in robe",
             )
             n2, g2 = head_geo(review_id)
@@ -225,7 +253,9 @@ def run_t1(page: Page) -> None:
             )
             _, g2 = head_geo(review_id)
             w2 = next(w for w in g2["walls"] if w["id"] == wid)
-            assert any(o["type"] == "door" for o in w2["openings"]), "front door not added to lounge"
+            assert any(o["type"] == "door" for o in w2["openings"]), (
+                "front door not added to lounge"
+            )
 
         record("front door relocated to the lounge wall", t_front_door)
 
@@ -237,7 +267,9 @@ def run_t1(page: Page) -> None:
             assert internal_area(g) > area0 + 1, (
                 f"internal area did not grow ({internal_area(g):.1f} vs {area0:.1f})"
             )
-            assert g["meta"].get("envelope") == env0, "envelope changed — footprint is not immutable"
+            assert g["meta"].get("envelope") == env0, (
+                "envelope changed — footprint is not immutable"
+            )
 
         record("head: more beds/baths, more internal area, envelope byte-identical", t_outcome)
 
@@ -338,7 +370,9 @@ def main() -> None:
         browser = pw.chromium.launch()
         page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
         # a real user sees the first-run coach once; tests drive the UI, so pre-dismiss it
-        page.add_init_script("try{window.localStorage.setItem('fps-coach-dismissed','1')}catch(e){}")
+        page.add_init_script(
+            "try{window.localStorage.setItem('fps-coach-dismissed','1')}catch(e){}"
+        )
         run_t1(page)
         run_t2(page)
         browser.close()
@@ -350,7 +384,8 @@ def main() -> None:
     lines = [
         "# Golden path — 231 Peats Ferry Rd",
         "",
-        f"{passed} passed · {failed} failed · {skipped} skipped · {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"{passed} passed · {failed} failed · {skipped} skipped · "
+        f"{time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "| Step | Status | s |",
         "|---|---|---|",
@@ -359,7 +394,9 @@ def main() -> None:
         note = f" — {r.get('error', '')}" if r["status"] in ("FAIL", "SKIP") else ""
         lines.append(f"| {r['feature']}{note} | {r['status']} | {r['seconds']} |")
     (ART / "golden_path_report.md").write_text("\n".join(lines) + "\n")
-    print(f"\n{passed} passed · {failed} failed · {skipped} skipped → {ART / 'golden_path_report.md'}")
+    print(
+        f"\n{passed} passed · {failed} failed · {skipped} skipped → {ART / 'golden_path_report.md'}"
+    )
     if failed:
         raise SystemExit(1)
 
