@@ -136,7 +136,7 @@ def convert_v1(data: dict[str, Any]) -> PlanGeometry:
     for raw in data.get("openings", []):
         x, y = float(raw["x"]), float(raw["y"])
         w, h = float(raw["w"]), float(raw["h"])
-        level_walls = walls_by_level.get(str(raw.get("level") or DEFAULT_LEVEL), walls)
+        level_walls = walls_by_level.get(str(raw.get("level") or DEFAULT_LEVEL), [])
         if h >= w:  # tall punch → vertical wall
             hit = locate_wall(level_walls, vertical=True, coord=x + w / 2, lo=y, hi=y + h)
         else:

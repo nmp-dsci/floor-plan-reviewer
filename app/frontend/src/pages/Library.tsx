@@ -107,9 +107,16 @@ function Thumb({ src }: { src: string }) {
 function DeleteControl({ planId, onDeleted }: { planId: string; onDeleted: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   if (!confirming) {
     return (
-      <button className="ghost danger" onClick={() => setConfirming(true)}>
+      <button
+        className="ghost danger"
+        onClick={() => {
+          setError('');
+          setConfirming(true);
+        }}
+      >
         Delete
       </button>
     );
@@ -122,10 +129,14 @@ function DeleteControl({ planId, onDeleted }: { planId: string; onDeleted: () =>
         disabled={busy}
         onClick={() => {
           setBusy(true);
+          setError('');
           api
             .deletePlan(planId)
             .then(onDeleted)
-            .catch(() => setBusy(false));
+            .catch((e) => {
+              setBusy(false);
+              setError(String(e));
+            });
         }}
       >
         {busy ? '…' : 'yes'}
@@ -133,6 +144,7 @@ function DeleteControl({ planId, onDeleted }: { planId: string; onDeleted: () =>
       <button className="ghost" onClick={() => setConfirming(false)}>
         no
       </button>
+      {error && <span className="lib-confirm-error">{error}</span>}
     </span>
   );
 }

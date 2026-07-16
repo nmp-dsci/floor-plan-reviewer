@@ -70,6 +70,16 @@ export default function ReviewStrip({
             <button className="linklike" onClick={() => onVersion(head)}>
               jump to head
             </button>
+            {head > 0 && (
+              <button
+                className="linklike danger"
+                disabled={busy}
+                title={`Delete v${pad(head)} — rolls back to editable v${pad(head - 1)}`}
+                onClick={() => onDeleteVersion(head)}
+              >
+                delete v{pad(head)}
+              </button>
+            )}
           </span>
         ) : (
           head > 0 && (

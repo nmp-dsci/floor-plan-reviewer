@@ -181,6 +181,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
   // Shared by ⌘Z and the on-canvas Undo control.
   const handleUndo = useCallback(() => {
     if (pending.length > 0) {
+      if (busy) return;
       setPending((p) => p.slice(0, -1));
       return;
     }
@@ -335,7 +336,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
   const canvasOriginal = original ? levelGeometry(original, active) : null;
   const canvasVp = viewport(canvasGeo);
   const aspect = canvasVp.width / canvasVp.height;
-  const canUndo = pending.length > 0 || (atHead && head > 0 && !busy);
+  const canUndo = (pending.length > 0 || (atHead && head > 0)) && !busy;
 
   const changeLevel = (levelId: string) => {
     setActiveLevel(levelId);

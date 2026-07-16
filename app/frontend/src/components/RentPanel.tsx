@@ -84,12 +84,13 @@ export default function RentPanel({ review }: { review: Review }) {
         )}
         {contributions.map((c) => {
           const amt = c.rent_impact_per_week;
+          const awaitingRepricing = c.flags.some((f) => /re-assess|re-price/i.test(f));
           return (
             <div className="contrib" key={`${c.n}-${c.id}`}>
               <span className="t">{c.title}</span>
               <span className={`amt mono ${amt > 0 ? 'up' : amt < 0 ? 'down' : 'zero'}`}>
                 {amt > 0 ? '+' : amt < 0 ? '−' : ''}
-                {amt === 0 ? 'pending' : dollars(Math.abs(amt))}
+                {awaitingRepricing ? 'pending' : dollars(Math.abs(amt))}
               </span>
             </div>
           );

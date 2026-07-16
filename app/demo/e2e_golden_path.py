@@ -319,7 +319,20 @@ def run_t2(page: Page) -> None:
     record("T2 · upload → ingest → approve → live re-price (≥3 comps)", t_upload_ingest_reprice)
 
 
+def preflight() -> None:
+    """Confirm the compose stack is reachable before running any scenario."""
+    for name, url in (("backend", f"{API}/api/health"), ("frontend", BASE)):
+        try:
+            urllib.request.urlopen(url, timeout=5).read()
+        except (urllib.error.URLError, ConnectionError, TimeoutError) as exc:
+            raise SystemExit(
+                f"golden path needs the compose stack — {name} unreachable at {url} ({exc}).\n"
+                "Run: make -C app up"
+            ) from exc
+
+
 def main() -> None:
+    preflight()
     ART.mkdir(exist_ok=True)
     with sync_playwright() as pw:
         browser = pw.chromium.launch()

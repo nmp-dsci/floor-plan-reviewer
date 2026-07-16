@@ -452,8 +452,9 @@ footer { margin-top: 30px; font-size: 11.5px; color: var(--faint); text-align: c
 .lib-actions { margin-top: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding-top: 4px; }
 .lib-actions .primary { font-size: 10.5px; padding: 6px 12px; }
 .lib-actions .ghost { font-size: 11px; padding: 4px 9px; }
-.lib-confirm { font-size: 11.5px; color: var(--faint); display: inline-flex; gap: 6px; align-items: center; }
+.lib-confirm { font-size: 11.5px; color: var(--faint); display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .lib-confirm .ghost { font-size: 11px; padding: 3px 8px; }
+.lib-confirm-error { color: var(--red); font-size: 11px; width: 100%; }
 
 .lib-drop-card { display: flex; }
 .lib-drop {
