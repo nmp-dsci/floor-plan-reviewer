@@ -5,6 +5,10 @@
 `app/` — `make -C app up`. P6 (AWS) remains open. This spec is self-contained: a developer/agent
 can implement from it.
 
+(A separate later restyle, `.lavish/s07_restyle-plan.html`, reused the same P0–P5 phase labels for
+its own layout/guidance-only pass over this app's UI — see AGENTS.md "Studio app UI" for what it
+changed; this spec's P0–P6 above are the original build phases.)
+
 ## Goal
 
 Turn the chat/lavish review loop (proven on `231-peats-ferry-rd`, v01–v03) into a local-first web
@@ -19,12 +23,13 @@ the s00 review page. Built to deploy to AWS later exactly like sibling `data-qa-
 |---|----------|--------|
 | D1 | App location | `app/` subfolder of this repo — chat workflow + app share `plan-core` and property folders |
 | D2 | Plan canvas | **d3 + SVG** — every room/wall is a DOM node; selection, hover, diff colouring native |
-| D3 | Backend & agent | **FastAPI + Pydantic AI** (mirrors data-qa-agent locked decision F); model provider per D5 |
+| D3 | Backend & agent | **FastAPI + the Claude Agent SDK** (`claude-agent-sdk`; supersedes the original Pydantic AI choice — see D5); auth per D5 |
 | D4 | Persistence | **Postgres in docker-compose from P0** — same engine as AWS RDS/Aurora later |
-| D5 | Model provider | **Abstracted, mirroring data-qa-agent decision G** (owner, 2026-07-12): Pydantic AI model string from config — default **DeepSeek (`deepseek-chat`)** for the geometry-ops loop as the cost option; **Claude** one-env-var swappable for quality escalation and **required for P4 vision ingestion** (DeepSeek's API takes no image input). The validator bounce-back loop is what makes the cheaper default safe. |
+| D5 | Model provider | **Revised 2026-07-14 (agent-sdk migration):** all LLM calls (geometry-ops loop, comps, and P4 vision) run through the **Claude Agent SDK** (`claude-agent-sdk`) on **`claude-opus-4-8`**, authenticated by the operator's **Claude subscription** (`CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`) — no paid API key. Structured JSON comes from the SDK's `output_format` json-schema (relaxed for the `Op` discriminated union: drop `discriminator`, `oneOf`→`anyOf`, `additionalProperties:false`); the validator bounce-back loop still guards output. *Superseded:* the original decision (owner, 2026-07-12) used Pydantic AI with a config model string — DeepSeek (`deepseek-chat`) as the cost default, Claude for vision — because DeepSeek's API takes no image input. |
 
-Keys in `app/.env` (never committed): `DEEPSEEK_API_KEY` for the default loop;
-`ANTHROPIC_API_KEY` for vision ingestion / escalation.
+Key in `app/.env` (never committed): `CLAUDE_CODE_OAUTH_TOKEN` for all LLM calls (from
+`claude setup-token`; never set `ANTHROPIC_API_KEY` — it outranks the subscription token).
+`TAVILY_API_KEY` for live rent comps.
 
 Open question (deliberately deferred to P6): auth provider — Cognito vs Entra External ID.
 
@@ -52,6 +57,11 @@ between junctions), then addressable. All coordinates metres; axis-aligned only 
 // queued change-list item
 { "id": "q1", "targets": [ ... ], "text": "open this wall — servery window", "status": "queued" }
 ```
+
+Every room and fixture also carries a `level` id (default `level-1`) tagging the storey or
+detached structure it belongs to; `meta.levels` holds the ordered `[{id, name}]` and
+`meta.envelopes` the pinned per-level footprint. A single-building plan is just one level. See
+AGENTS.md "Multi-level plans" for how walls, validation, and footprint run per level.
 
 **Ids are stable across versions** — agent ops reuse ids for modifications, mint new ones for
 additions. That makes diffing set comparison: `add` / `remove` / `modify` per room/wall/opening.
@@ -84,13 +94,18 @@ additions. That makes diffing set comparison: `add` / `remove` / `modify` per ro
 + open  hall→bed-5    0.9m         door
 ```
 
+**Updated 2026-07-16 (restyle P3):** this raw hunk is still generated from the diff and still the
+audit trail, but the register's default view is now a plain-English sentence per change plus its
+rent contribution — the hunk above sits one "show exact ops" disclosure away. See AGENTS.md
+"Studio app UI" for the current presentation.
+
 ## Architecture (mirrors data-qa-agent)
 
 - **frontend** — React + Vite + TS; d3 SVG canvas, delta view, register, change list. REST + SSE.
 - **backend-api** — FastAPI; plans/reviews/versions/comments; SSE events; storage adapter
   (local volume → S3).
-- **plan-agent** — Pydantic AI + pluggable LLM (D5: DeepSeek default, Claude for
-  vision/escalation); applies comment batches via **typed geometry ops only**
+- **plan-agent** — Claude Agent SDK on the operator's Claude subscription (D5); applies
+  comment batches via **typed geometry ops only**
   (`split_room`, `merge_rooms`, `set_kind`, `add_opening(wall,t0,t1,type)`,
   `remove_wall_chunk`, `add_fixture`, …) — never SVG/pixels. Vision ingest (P4), rent comps +
   compliance (P5).
@@ -112,6 +127,7 @@ additions. That makes diffing set comparison: `add` / `remove` / `modify` per ro
 | `GET /reviews/{id}/versions/{n}` | Geometry + diff-vs-original + register |
 | `GET /reviews/{id}/events` | SSE: job progress, `version.ready` |
 | `GET /reviews/{id}/versions/{n}/export.png` | Pillow render — parity with chat workflow |
+| `DELETE /plans/{id}` | Remove a dead-draft plan (unlinks files under `STORAGE_DIR` only); refuses the seed plan and sandbox plans (P4 restyle, §s07) |
 
 ## Phases — every phase ends runnable locally (`make up`)
 
@@ -120,7 +136,7 @@ additions. That makes diffing set comparison: `add` / `remove` / `modify` per ro
 | P0 Scaffold | compose (frontend, backend-api, plan-agent stub, Postgres); schema v2 + converter from `plan_v03.json`; d3 renderer matching Pillow look; room click-select; comment queue; echo agent | `make up` → load 231-peats-ferry-rd → select room → queue → Send → v04 (echo) appears |
 | P1 Walls | wall derivation; segment/chunk hit-testing + handles; long-press multi-select; target chips | one comment carries room + wall-chunk targets |
 | P2 Diff | object diff; delta view; generated git-style register | original vs v03 shows c01–c07 with no hand-written register |
-| P3 Agent loop | Pydantic AI + pluggable LLM (D5 — DeepSeek default); typed ops + validator bounce-back; SSE; per-version rent stats | the v03 lavish session replayed entirely in-app |
+| P3 Agent loop | Claude Agent SDK on the operator's subscription (D5); typed ops + validator bounce-back; SSE; per-version rent stats | the v03 lavish session replayed entirely in-app |
 | P4 Ingestion | upload PNG → vision extract (Claude multimodal, per D5) → scale-confirm wizard (two known dims) → draft → approve (app's scope.md lock) | new property: image → reviewable geometry in one sitting |
 | P5 Parity | rent comps + compliance per change; SUMMARY + PNG export; library page | app output matches repo paper-trail contract |
 | P6 AWS | Terraform mirroring `data-qa-agent/infra/terraform`: App Runner ×3, RDS Postgres, S3+CloudFront, Secrets Manager, GH Actions deploy on main; auth decided here | merge to main deploys; compose and cloud shapes 1:1 |
@@ -134,7 +150,7 @@ floor-plan-reviewer/
     ├── frontend/               # React + Vite + TS, d3 canvas, register, change list
     ├── services/
     │   ├── backend-api/        # FastAPI: REST + SSE, Postgres, storage adapter
-    │   └── plan-agent/         # Pydantic AI + Claude: ops loop, ingest, comps (later)
+    │   └── plan-agent/         # Claude Agent SDK: ops loop, ingest, comps
     ├── packages/plan-core/     # schema v2, wall derivation, diff, validate, Pillow export
     ├── db/                     # migrations
     ├── docker-compose.yml
@@ -148,6 +164,8 @@ floor-plan-reviewer/
 2. **Wall-chunk UX** → whole-segment default; chunks only via drag handles; snapping; fat strokes.
 3. **Geometry corruption** → all agent edits through plan-core validation with bounce-back;
    immutable versions; head-only writes.
-4. **Rect-only model** → no diagonal/curved walls, single storey per plan object (multi-storey =
-   one object per level, later).
+4. **Rect-only model** → no diagonal/curved walls (v1 constraint holds). Multi-storey and detached
+   structures are now supported within one plan object: each room/fixture carries a `level` id and
+   each level renders/validates/derives walls in its own coordinate origin (delivered 2026-07-15;
+   see AGENTS.md "Multi-level plans").
 5. **Two renderers, one look** → plan-core owns shared style constants.

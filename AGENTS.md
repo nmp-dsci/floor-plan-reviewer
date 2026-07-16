@@ -37,7 +37,9 @@ to Bed 1; new entry) — it defines the visual style the renderer reproduces, an
 ## Core invariants — never break these
 
 1. **Envelope is immutable.** Never alter the land boundary, external building envelope, or
-   roofline unless `scope.md` for that property explicitly stipulates it.
+   roofline unless `scope.md` for that property explicitly stipulates it. For multi-level plans in
+   the Studio app this is enforced **per level** — each storey/structure has its own pinned
+   footprint that can neither grow nor shrink.
 2. **Scope is a contract.** Never propose a change type outside the locked `scope.md`. Widening
    scope requires the user to re-confirm `scope.md` (record the change in its changelog).
 3. **`original.png` is never modified.** All renders are new files.
@@ -293,14 +295,83 @@ the skill [`.claude/skills/frontend-style/SKILL.md`](./.claude/skills/frontend-s
 - No shadows, border-radius, or gradients anywhere.
 - Canvas semantics are LOCKED: ink walls, red selection, green/red/amber delta — never restyled.
 
+## Multi-level plans (Studio app, schema v2)
+
+A single listing image can hold several distinct plan blocks — multiple storeys and/or a **detached
+structure** (garage, studio, carport) drawn off to one side. The Studio app models each block as a
+**level**; a plain single-building plan is just one level (tabs hidden, behaviour unchanged).
+
+- **Geometry**: every `Room` and `Fixture` carries a `level` id. Each level has its **own local
+  coordinate origin** (top-left ≈ 0,0) — levels never share or connect coordinates. `PlanGeometry`
+  helpers: `levels()` / `level_ids()` / `rooms_on(id)` / `envelope_for(id)`. `meta["levels"]` holds
+  the ordered `[{id, name}]`; `meta["envelopes"]` holds the pinned per-level footprint. The legacy
+  single `meta["envelope"]` is retained for back-compat (single-level plans).
+- **Validation, walls, footprint** all run **per level** — an overlap or envelope breach on the
+  garage is never measured against the house, and `derive_walls` never bridges two levels.
+- **Vision ingest** (`plan-agent`) segments the image into levels; each room is tagged with its
+  level, each level laid out in its own origin.
+- **Load robustness**: `convert` heals sliver overlaps (vision rounding); the validator downgrades
+  modest overlaps to **warnings** (only gross, genuinely-stacked overlaps error), so a dense plan
+  is approvable instead of dead-ended.
+- **UI**: a level tab strip (`components/LevelTabs.tsx`) sits above the canvas in Review + Ingest;
+  the active level filters the geometry via `levelGeometry(geo, id)`. New rooms/fixtures land on the
+  active level.
+
+## Studio app UI (Drafting Ink 2.0 restyle, 2026-07-16)
+
+The review page is a canvas-first **workspace**, not a scrolling document (restyle spec:
+`.lavish/s07_restyle-plan.html`, phases P0–P5) — same validated op pipeline and locked canvas
+semantics; only layout, hierarchy, and guidance changed:
+
+- **Canvas**: `PlanCanvas.tsx` is untouched; `components/CanvasStage.tsx` wraps it in a zoom/fit
+  viewport (native SVG width scaling keeps `getScreenCTM()` and every gesture exact) with floating
+  zoom/fit/undo controls and a persistent on-canvas delta legend (`+`/`−`/`△` glyphs). No
+  page-level scroll on the review route; the workspace is inset in a framed panel so the
+  header/dock/version strip never bleed to the viewport edge.
+- **Right rail**: the four former stacked cards are a tabbed dock (`components/Dock.tsx`) — EDIT
+  (Inspector) / AGENT (change list) / HISTORY (versions + register) / RENT
+  (`components/RentPanel.tsx`); selecting an object auto-raises EDIT, queued comments badge AGENT.
+- **Bottom strip** (`components/ReviewStrip.tsx`) splits version identity (pills, bookmark,
+  delete) from the Proposed/Delta lens, so switching versions never reads as switching views.
+- **Register** (`components/Register.tsx`) renders each change as a plain sentence with its rent
+  contribution; the exact op diff (the old raw hunk) sits one "show exact ops" disclosure away —
+  same underlying data, two altitudes.
+- **Rent panel**: baseline→proposed meter against the live comps range, per-change $ contributions
+  (only priced changes summed — no invented numbers), and an amber stale-rent banner when the
+  latest change hasn't been re-priced yet.
+- **Library** (`pages/Library.tsx`) is a card grid with real plan thumbnails (reuses the existing
+  image/export endpoints) and a drag-drop upload card with preview; the duplicate "Upload plan"
+  nav item is gone — upload lives only in the library. Draft cards get a
+  `DELETE /api/plans/{id}` control for dead drafts (refuses the seed plan `create_sandbox()`
+  clones from, and any plan with a running job; only unlinks files under `STORAGE_DIR`, so a seed
+  image can never be removed). `pages/Ingest.tsx` shows the same three ingest actions as a
+  numbered stepper.
+- **Guidance**: a first-run `Coach` overlay (once per browser, stored in `localStorage`) explains
+  the Edit/Agent lanes; a `?` shortcut sheet renders from the `SHORTCUTS` registry in
+  `features.ts` so it can't drift from the real handlers.
+- **Golden-path gate**: `app/demo/e2e_golden_path.py` (`make -C app golden`, wired into
+  `make -C app test`) replays the canonical 231 Peats Ferry Rd scenario — garage → store + robe +
+  ensuite, balcony → living, kitchen/living/dining + pantry, BED 1 walk-in robe + ensuite, front
+  door to lounge — through the shared `/edits` pipeline against a throwaway sandbox, asserting
+  geometry, envelope-immutability, and the on-canvas delta render. This deterministic T1 tier
+  always runs; a T2 tier (live upload → vision ingest → agent re-price with comps) is opt-in via
+  `GOLDEN_T2=1` and skipped **loudly** otherwise, since vision ingest is non-deterministic.
+- **plan-agent image** now installs Node.js and the `@anthropic-ai/claude-code` CLI — a runtime
+  dependency of `claude-agent-sdk`.
+
 ## Roadmap (later phases — not v1)
 
 1. Renderer unit tests + `jsonschema` validation of `changes_v##.json`.
-2. Multi-storey support (several plan images per property).
+2. ~~Multi-storey support~~ **Delivered in the Studio app** (2026-07-15): the geometry model
+   carries **levels** — storeys *and* detached structures (e.g. a detached garage). See
+   "Multi-level plans" below. (The docs-as-agent renderer scripts remain single-image for now.)
 3. Dual-occupancy module (second kitchen + separate entry) as an opt-in scope stipulation.
 4. Optional cost/ROI overlay (decision J revisited) and budget caps.
 5. Styled-plan renderer polish: door swing arcs, window breaks, compass, site-plan panel.
 6. **Floor-Plan Studio web app** — plan APPROVED 2026-07-12, spec in
    [`ai_specs/s01_floorplan-studio-plan.md`](./ai_specs/s01_floorplan-studio-plan.md): `app/`
-   subfolder, React + d3 SVG canvas, FastAPI + Pydantic AI (pluggable LLM — DeepSeek default,
-   Claude for vision), Postgres, phases P0–P6 ending in AWS App Runner like data-qa-agent.
+   subfolder, React + d3 SVG canvas, FastAPI + the Claude Agent SDK — all LLM calls (ops, comps,
+   vision) run on the operator's Claude subscription via `CLAUDE_CODE_OAUTH_TOKEN` (revised from
+   the original "pluggable LLM — DeepSeek default, Claude for vision" plan) — Postgres, phases
+   P0–P6 ending in AWS App Runner like data-qa-agent. The review UI was restyled into a
+   canvas-first workspace 2026-07-16 — see "Studio app UI" above. P6 (AWS) remains open.

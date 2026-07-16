@@ -31,11 +31,11 @@ export const api = {
         comments: comments.map((c) => ({ text: c.text, targets: c.targets })),
       }),
     }),
-  applyEdits: (id: string, versionN: number, ops: Op[], title: string) =>
+  applyEdits: (id: string, versionN: number, ops: Op[], title: string, level = '') =>
     json<{ n: number; warnings: string[] }>(`/api/reviews/${id}/edits`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ version_n: versionN, ops, title }),
+      body: JSON.stringify({ version_n: versionN, ops, title, level }),
     }),
   registers: (id: string) =>
     json<{ n: number; register: RegisterHunk[] }[]>(`/api/reviews/${id}/registers`),
@@ -54,6 +54,8 @@ export const api = {
   refreshComps: (id: string) =>
     json<{ comps: Comp[] }>(`/api/reviews/${id}/comps/refresh`, { method: 'POST' }),
   planImageUrl: (planId: string) => `/api/plans/${planId}/image`,
+  deletePlan: (planId: string) =>
+    json<{ deleted: boolean }>(`/api/plans/${planId}`, { method: 'DELETE' }),
   uploadPlan: async (file: File, address: string) => {
     const form = new FormData();
     form.append('file', file);

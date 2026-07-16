@@ -42,6 +42,22 @@ def _subtract(base: Interval, covers: list[Interval]) -> list[Interval]:
 
 
 def derive_walls(rooms: list[Room]) -> list[Wall]:
+    """Derive walls per level and concat — rooms on different storeys/structures share
+    a coordinate space (each level has its own origin), so adjacency must never be
+    computed across levels or ghost partitions appear in the empty gap between them."""
+    levels: list[str] = []
+    for r in rooms:
+        if r.level not in levels:
+            levels.append(r.level)
+    if len(levels) <= 1:
+        return _derive_walls_one_level(rooms)
+    walls: list[Wall] = []
+    for lid in levels:
+        walls.extend(_derive_walls_one_level([r for r in rooms if r.level == lid]))
+    return walls
+
+
+def _derive_walls_one_level(rooms: list[Room]) -> list[Wall]:
     z0 = sorted((r for r in rooms if r.z == 0), key=lambda r: r.id)
     z1 = sorted((r for r in rooms if r.z != 0), key=lambda r: r.id)
     walls: list[Wall] = []

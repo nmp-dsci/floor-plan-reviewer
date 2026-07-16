@@ -64,24 +64,34 @@ The chat workflow above is also a local-first web app (`app/` — phases P0–P5
 [`ai_specs/s01_floorplan-studio-plan.md`](./ai_specs/s01_floorplan-studio-plan.md)):
 
 ```bash
-cp app/.env.example app/.env    # add DEEPSEEK_API_KEY (+ ANTHROPIC_API_KEY for vision ingest)
+cp app/.env.example app/.env    # add CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token` — runs on your Claude subscription)
 make -C app up                  # docker compose: frontend + backend-api + plan-agent + Postgres
 open http://localhost:5175
 ```
 
-- The plan is a **shape object**: every room and wall is a selectable SVG node (d3). Click a room,
-  click a wall (drag the handles to pick a chunk), long-press or shift-click to multi-select.
-- Comments queue into a change list; **Send** hands them to a Pydantic AI agent (DeepSeek by
-  default, per spec D5) that edits geometry only through typed, validated operations — the
-  envelope is unbreakable.
-- Every version shows a **computed delta view** (green added / red removed / amber modified) and a
-  **git-style change register** generated from the geometry diff, with rent impact and NSW
-  advisory flags per hunk.
-- Upload any listing floor-plan image and the Claude vision agent drafts the geometry for review
-  (P4); rent comps refresh live via Tavily (P5); every version exports the styled PNG.
+- The review page is a full-height, canvas-first **workspace** (no page scroll): the plan is a
+  **shape object** — every room and wall a selectable SVG node (d3) — with floating zoom/fit/undo
+  controls, and a tabbed right-hand dock (EDIT / AGENT / HISTORY / RENT) instead of stacked cards.
+  Click a room, click a wall (drag the handles to pick a chunk), long-press or shift-click to
+  multi-select; selecting an object raises the EDIT tab.
+- Comments queue into the AGENT tab; **Send** hands them to a Claude Agent SDK agent (running on
+  your Claude subscription, per spec D5) that edits geometry only through typed, validated
+  operations — the envelope is unbreakable.
+- Every version shows a **computed delta view** (green added / red removed / amber modified, with
+  a persistent on-canvas legend) and a change **register** that reads as plain sentences with the
+  rent impact — the exact op diff is one "show exact ops" disclosure away. The RENT tab tracks a
+  baseline→proposed meter against live comps and a per-change $ breakdown.
+- The library is a card grid with real plan thumbnails; drop or browse to upload a listing image
+  and the Claude vision agent drafts the geometry through a 3-step wizard (P4); rent comps refresh
+  live via Tavily (P5); every version exports the styled PNG.
+- A first-run coach and a `?` shortcut sheet walk through the two editing lanes and the gestures.
+- A golden-path regression (231 Peats Ferry Rd, `make -C app golden`) gates every change: it
+  replays the canonical scope through the same `/edits` pipeline the UI uses and asserts geometry,
+  envelope-immutability, and the on-canvas delta render.
 
 Demo walkthrough (real session on 231 Peats Ferry Rd): `app/demo/artifacts/walkthrough.mp4` —
-see [`app/demo/DEMO.md`](./app/demo/DEMO.md) for the narrated script.
+see [`app/demo/DEMO.md`](./app/demo/DEMO.md) for the narrated script (predates this restyle; the
+loop it shows is unchanged).
 
 ## Project boundaries
 
@@ -109,7 +119,7 @@ examples/                  # style references (e.g. floorplan-styling.webp)
 
 Early scaffold: workflow docs + renderer are in place; first end-to-end run on
 `231-peats-ferry-rd` is next. Later: renderer tests, multi-storey plans, dual-occupancy module,
-cost/ROI overlay, SVG redraws, and graduating the workflow into a standalone Pydantic AI app.
+cost/ROI overlay, SVG redraws, and graduating the workflow into a standalone Agent SDK app.
 
 ---
 

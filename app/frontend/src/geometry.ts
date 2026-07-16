@@ -1,5 +1,50 @@
-import type { PlanGeometry, Room, Wall } from './types';
+import type { PlanGeometry, PlanLevel, Room, Wall } from './types';
 // (wall helpers are defined below; clear-size functions at the bottom use them)
+
+export const DEFAULT_LEVEL = 'level-1';
+
+const levelName = (id: string): string =>
+  id
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+const roomLevel = (r: Room): string => r.level ?? DEFAULT_LEVEL;
+
+/** Ordered [{id,name}] for the tab strip — from meta.levels, else derived from rooms. */
+export function planLevels(geo: PlanGeometry): PlanLevel[] {
+  const meta = (geo.meta['levels'] as PlanLevel[] | undefined) ?? [];
+  if (meta.length > 0) return meta.map((l) => ({ id: l.id, name: l.name || levelName(l.id) }));
+  const seen: string[] = [];
+  for (const r of geo.rooms) if (!seen.includes(roomLevel(r))) seen.push(roomLevel(r));
+  const ids = seen.length > 0 ? seen : [DEFAULT_LEVEL];
+  return ids.map((id) => ({ id, name: levelName(id) }));
+}
+
+/** Pinned footprint of one level, falling back to legacy single envelope / bbox. */
+export function envelopeForLevel(geo: PlanGeometry, levelId: string): [number, number, number, number] {
+  const envelopes = geo.meta['envelopes'] as Record<string, number[]> | undefined;
+  const env = envelopes?.[levelId];
+  if (env) return [env[0], env[1], env[2], env[3]];
+  if (planLevels(geo).length === 1 && geo.meta['envelope'])
+    return geo.meta['envelope'] as [number, number, number, number];
+  const rooms = geo.rooms.filter((r) => roomLevel(r) === levelId);
+  if (rooms.length === 0) return [0, 0, 0, 0]; // roomless level: degenerate, never the whole plan
+  return bbox(rooms);
+}
+
+/** A single level's slice of the plan: only its rooms/walls/fixtures, with meta.envelope
+ * set to that level's footprint so the existing canvas/viewport render it unchanged. */
+export function levelGeometry(geo: PlanGeometry, levelId: string): PlanGeometry {
+  const rooms = geo.rooms.filter((r) => roomLevel(r) === levelId);
+  const roomIds = new Set(rooms.map((r) => r.id));
+  return {
+    ...geo,
+    rooms,
+    walls: geo.walls.filter((w) => roomIds.has(w.a)),
+    fixtures: geo.fixtures.filter((f) => (f.level ?? DEFAULT_LEVEL) === levelId),
+    meta: { ...geo.meta, envelope: envelopeForLevel(geo, levelId) },
+  };
+}
 
 export const PX_PER_M = 60;
 export const MARGIN_M = 0.8;
@@ -99,6 +144,153 @@ export function diffRooms(original: PlanGeometry, proposed: PlanGeometry): RoomD
 
 export function snapM(v: number, step = 0.05): number {
   return Math.round(v / step) * step;
+}
+
+// ---- wall derivation (TS mirror of plan_core.walls.derive_walls) ----
+// Used to re-derive walls in the local edit preview so a moved/added wall shows in
+// its new position before the change is applied on the server. Kept in lock-step with
+// walls.py: per-level grouping, GAP_TOL adjacency, exterior = uncovered edge segments.
+const GAP_TOL = 0.35;
+const MIN_SHARED = 0.3;
+type Interval = [number, number];
+const rx2 = (r: Room) => r.x + r.w;
+const ry2 = (r: Room) => r.y + r.h;
+
+function overlapIv(a0: number, a1: number, b0: number, b1: number): Interval | null {
+  const lo = Math.max(a0, b0);
+  const hi = Math.min(a1, b1);
+  return hi - lo >= MIN_SHARED ? [lo, hi] : null;
+}
+
+function subtractIv(base: Interval, covers: Interval[]): Interval[] {
+  let pieces: Interval[] = [base];
+  for (const [c0, c1] of [...covers].sort((p, q) => p[0] - q[0])) {
+    const next: Interval[] = [];
+    for (const [p0, p1] of pieces) {
+      if (c1 <= p0 || c0 >= p1) {
+        next.push([p0, p1]);
+        continue;
+      }
+      if (c0 - p0 >= MIN_SHARED) next.push([p0, c0]);
+      if (p1 - c1 >= MIN_SHARED) next.push([c1, p1]);
+    }
+    pieces = next;
+  }
+  return pieces;
+}
+
+function deriveWallsOneLevel(rooms: Room[]): Wall[] {
+  const z0 = rooms.filter((r) => r.z === 0).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const z1 = rooms.filter((r) => r.z !== 0).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const walls: Wall[] = [];
+  const coverage = new Map<string, Interval[]>();
+  const cover = (rid: string, edge: string, iv: Interval) => {
+    const k = `${rid}|${edge}`;
+    const cur = coverage.get(k);
+    if (cur) cur.push(iv);
+    else coverage.set(k, [iv]);
+  };
+  const addWall = (a: string, b: string, line: [number, number, number, number]) => {
+    const [first, second] = b !== 'exterior' ? [a, b].sort() : [a, b];
+    const k = walls.filter((w) => w.a === first && w.b === second).length;
+    walls.push({ id: `w:${first}|${second}:${k}`, a: first, b: second, line, t: 0.12, openings: [] });
+  };
+  for (let i = 0; i < z0.length; i++) {
+    for (let j = i + 1; j < z0.length; j++) {
+      const ra = z0[i];
+      const rb = z0[j];
+      for (const [lft, rgt] of [[ra, rb], [rb, ra]] as [Room, Room][]) {
+        if (Math.abs(rx2(lft) - rgt.x) <= GAP_TOL) {
+          const iv = overlapIv(lft.y, ry2(lft), rgt.y, ry2(rgt));
+          if (iv) {
+            const xm = (rx2(lft) + rgt.x) / 2;
+            addWall(lft.id, rgt.id, [xm, iv[0], xm, iv[1]]);
+            cover(lft.id, 'right', iv);
+            cover(rgt.id, 'left', iv);
+          }
+        }
+      }
+      for (const [top, bot] of [[ra, rb], [rb, ra]] as [Room, Room][]) {
+        if (Math.abs(ry2(top) - bot.y) <= GAP_TOL) {
+          const iv = overlapIv(top.x, rx2(top), bot.x, rx2(bot));
+          if (iv) {
+            const ym = (ry2(top) + bot.y) / 2;
+            addWall(top.id, bot.id, [iv[0], ym, iv[1], ym]);
+            cover(top.id, 'bottom', iv);
+            cover(bot.id, 'top', iv);
+          }
+        }
+      }
+    }
+  }
+  for (const nr of z1) {
+    const parent = z0.find(
+      (p) => nr.x >= p.x - 0.11 && nr.y >= p.y - 0.11 && rx2(nr) <= rx2(p) + 0.11 && ry2(nr) <= ry2(p) + 0.11,
+    );
+    const pid = parent ? parent.id : 'exterior';
+    addWall(nr.id, pid, [nr.x, nr.y, rx2(nr), nr.y]);
+    addWall(nr.id, pid, [nr.x, ry2(nr), rx2(nr), ry2(nr)]);
+    addWall(nr.id, pid, [nr.x, nr.y, nr.x, ry2(nr)]);
+    addWall(nr.id, pid, [rx2(nr), nr.y, rx2(nr), ry2(nr)]);
+  }
+  const edgeSpecs: [string, boolean][] = [
+    ['left', true],
+    ['right', true],
+    ['top', false],
+    ['bottom', false],
+  ];
+  for (const r of z0) {
+    for (const [edge, vert] of edgeSpecs) {
+      const base: Interval = vert ? [r.y, ry2(r)] : [r.x, rx2(r)];
+      const coord = edge === 'left' ? r.x : edge === 'right' ? rx2(r) : edge === 'top' ? r.y : ry2(r);
+      for (const iv of subtractIv(base, coverage.get(`${r.id}|${edge}`) ?? [])) {
+        const line: [number, number, number, number] = vert
+          ? [coord, iv[0], coord, iv[1]]
+          : [iv[0], coord, iv[1], coord];
+        addWall(r.id, 'exterior', line);
+      }
+    }
+  }
+  return walls;
+}
+
+/** Re-derive walls from room rectangles (per level). Openings are re-homed by
+ * absolute position via rehomeOpenings. Mirrors plan_core.walls.derive_walls. */
+export function deriveWalls(rooms: Room[]): Wall[] {
+  const levels: string[] = [];
+  for (const r of rooms) {
+    const lv = r.level ?? DEFAULT_LEVEL;
+    if (!levels.includes(lv)) levels.push(lv);
+  }
+  return levels.length <= 1
+    ? deriveWallsOneLevel(rooms)
+    : levels.flatMap((lv) => deriveWallsOneLevel(rooms.filter((r) => (r.level ?? DEFAULT_LEVEL) === lv)));
+}
+
+/** Find the wall best matching an absolute span; returns {wall, t0, t1}. Mirrors
+ * plan_core.walls.locate_wall — used to re-home an opening onto re-derived walls by
+ * position (not wall id), so a swap/topology change keeps doors where the server will. */
+export function locateWall(
+  walls: Wall[],
+  vertical: boolean,
+  coord: number,
+  lo: number,
+  hi: number,
+  coordTol = 0.45,
+): { wall: Wall; t0: number; t1: number } | null {
+  let best: { olap: number; wall: Wall } | null = null;
+  for (const w of walls) {
+    if (wallIsVertical(w) !== vertical || Math.abs(wallCoord(w) - coord) > coordTol) continue;
+    const [wlo, whi] = wallSpan(w);
+    const olap = Math.min(hi, whi) - Math.max(lo, wlo);
+    if (olap > 0.05 && (best === null || olap > best.olap)) best = { olap, wall: w };
+  }
+  if (best === null) return null;
+  const w = best.wall;
+  const [wlo, whi] = wallSpan(w);
+  const t0 = Math.max(0, Math.min(1, absToT(w, Math.max(lo, wlo))));
+  const t1 = Math.max(0, Math.min(1, absToT(w, Math.min(hi, whi))));
+  return t1 - t0 > 1e-6 ? { wall: w, t0, t1 } : null;
 }
 
 // ---- clear dimensions (the ONE dimension standard — walls subtracted) ----

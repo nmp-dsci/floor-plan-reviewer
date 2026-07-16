@@ -20,11 +20,14 @@ rendering each impact as an annotated `propose_v##.png`.
 - **Setup / quality:** `uv sync` · `uv run ruff format . && uv run ruff check . --fix` ·
   `uv run mypy scripts`
 - **Floor-Plan Studio app (`app/`):** `make -C app up` (compose: frontend host :5175, backend
-  :8090, agent :8091, Postgres) · `make -C app test` · `make -C app smoke` · `make -C app reseed`
-  (wipe → pristine v03) · demos `make -C app demo-whats-new` / `demo-tour` / `demo-videos`
-  (narrated Playwright videos) — spec: `ai_specs/s01_floorplan-studio-plan.md`. Frontend follows
-  the "Drafting Ink" style guide (`.claude/skills/frontend-style/`); humans + agent share one
-  validated op pipeline (`POST /reviews/{id}/edits` for human edits, `/comments` for the agent).
+  :8090, agent :8091, Postgres) · `make -C app test` (runs the golden-path gate first, then
+  plan-core/plan-agent tests) · `make -C app golden` (231 PFR regression alone) · `make -C app
+  smoke` · `make -C app reseed` (wipe → pristine v03) · demos `make -C app demo-whats-new` /
+  `demo-tour` / `demo-videos` (narrated Playwright videos, predate the Drafting Ink 2.0 restyle) —
+  spec: `ai_specs/s01_floorplan-studio-plan.md`. Review is a canvas-first workspace (tabbed
+  EDIT/AGENT/HISTORY/RENT dock) per the "Drafting Ink" style guide
+  (`.claude/skills/frontend-style/`); humans + agent share one validated op pipeline
+  (`POST /reviews/{id}/edits` for human edits, `/comments` for the agent).
 - **Never:** touch the external envelope/boundary/roofline unless `scope.md` stipulates · propose
   outside the locked `scope.md` · quote rent without ≥ 3 cited live comps (pause if no web access) ·
   modify `original.png` · revise anything but the latest version

@@ -66,7 +66,7 @@ export default function App() {
         open={navOpen}
         onNavigate={() => setNavOpen(false)}
       />
-      <main className="content">
+      <main className={`content${current.page === 'review' ? ' content-review' : ''}`}>
         {current.page === 'review' && (
           <Review key={current.id} reviewId={current.id} onBusyChange={setBusy} onVersionAdded={refreshPlans} />
         )}

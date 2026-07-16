@@ -12,7 +12,17 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, TypeAdapter
 
 from plan_core.convert import kind_for, slugify
-from plan_core.schema import Fixture, Kind, Opening, OpeningType, PlanGeometry, Room, fixture_slug
+from plan_core.schema import (
+    DEFAULT_LEVEL,
+    Fixture,
+    Kind,
+    Opening,
+    OpeningType,
+    PlanGeometry,
+    Room,
+    Wall,
+    fixture_slug,
+)
 from plan_core.walls import derive_walls, locate_wall
 
 
@@ -59,6 +69,7 @@ class AddRoom(BaseModel):
     w: float
     h: float
     fill: Literal["white", "grey"] = "white"
+    level: str | None = None  # which storey/structure; defaults to the plan's first level
 
 
 class MergeRooms(BaseModel):
@@ -109,6 +120,7 @@ class AddFixture(BaseModel):
     w: float
     h: float
     label: str = ""
+    level: str | None = None
 
 
 class ModifyFixture(BaseModel):
@@ -159,6 +171,7 @@ class _AbsOpening(BaseModel):
     hi: float
     type: OpeningType
     id: str
+    level: str  # host structure — openings only re-home onto same-level walls
 
 
 class OpsResult(BaseModel):
@@ -167,6 +180,8 @@ class OpsResult(BaseModel):
 
 
 def _snapshot_openings(geo: PlanGeometry) -> list[_AbsOpening]:
+    # a wall's level is the level of its room (wall.a is always a real room id)
+    room_level = {r.id: r.level for r in geo.rooms}
     out: list[_AbsOpening] = []
     for w in geo.walls:
         for o in w.openings:
@@ -178,9 +193,15 @@ def _snapshot_openings(geo: PlanGeometry) -> list[_AbsOpening]:
                     hi=w.t_to_abs(o.t1),
                     type=o.type,
                     id=o.id,
+                    level=room_level.get(w.a, DEFAULT_LEVEL),
                 )
             )
     return out
+
+
+def _default_level(geo: PlanGeometry) -> str:
+    ids = geo.level_ids()
+    return ids[0] if ids else "level-1"
 
 
 def _unique_id(rooms: list[Room], name: str) -> str:
@@ -197,6 +218,8 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
     g = geo.model_copy(deep=True)
     warnings: list[str] = []
     abs_openings = _snapshot_openings(g)
+    # add_opening / remove_wall_chunk, resolved against the re-derived walls after the loop
+    deferred_openings: list[tuple[str, float, float, OpeningType, str]] = []
     max_oid = max(
         (int(o.id[1:]) for o in abs_openings if o.id[1:].isdigit()),
         default=0,
@@ -220,7 +243,13 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
             warnings.append(f"{op.op}: room '{other_ref}' not found; skipped")
             continue
         wall_ref = getattr(op, "wall_id", None)
-        if wall_ref is not None and all(w.id != wall_ref for w in g.walls):
+        # add_opening / remove_wall_chunk are resolved AFTER walls are re-derived (a room
+        # move in the same batch changes wall ids), so don't reject them against old walls.
+        if (
+            wall_ref is not None
+            and not isinstance(op, AddOpening | RemoveWallChunk)
+            and all(w.id != wall_ref for w in g.walls)
+        ):
             warnings.append(f"{op.op}: wall '{wall_ref}' not found; skipped")
             continue
 
@@ -270,6 +299,7 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
                     h=new[3],
                     fill=r.fill,
                     z=r.z,
+                    level=r.level,
                 )
             )
         elif isinstance(op, AddRoom):
@@ -284,10 +314,18 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
                     h=op.h,
                     fill=op.fill,
                     z=0,
+                    level=op.level or _default_level(g),
                 )
             )
         elif isinstance(op, MergeRooms):
             r, o = g.room(op.room_id), g.room(op.other_id)
+            if r.level != o.level:
+                # levels share a local origin, so cross-level rooms can overlap in
+                # coordinates and wrongly pass the rectangularity check — never merge them
+                warnings.append(
+                    f"merge_rooms {op.room_id}+{op.other_id}: different levels; skipped"
+                )
+                continue
             x0, y0 = min(r.x, o.x), min(r.y, o.y)
             x1, y1 = max(r.x2, o.x2), max(r.y2, o.y2)
             union_area = (x1 - x0) * (y1 - y0)
@@ -305,19 +343,10 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
         elif isinstance(op, RemoveRoom):
             g.rooms = [rm for rm in g.rooms if rm.id != op.room_id]
         elif isinstance(op, AddOpening | RemoveWallChunk):
-            w = g.wall(op.wall_id)
             t0, t1 = sorted((max(0.0, op.t0), min(1.0, op.t1)))
             typ: OpeningType = "open" if isinstance(op, RemoveWallChunk) else op.type
-            abs_openings.append(
-                _AbsOpening(
-                    vertical=w.vertical,
-                    coord=w.coord,
-                    lo=w.t_to_abs(t0),
-                    hi=w.t_to_abs(t1),
-                    type=typ,
-                    id=next_oid(),
-                )
-            )
+            # resolve against the re-derived walls (its id/positions are final there)
+            deferred_openings.append((op.wall_id, t0, t1, typ, next_oid()))
         elif isinstance(op, ModifyOpening):
             found = next((a for a in abs_openings if a.id == op.opening_id), None)
             if found is None:
@@ -341,7 +370,15 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
             while any(f.id == f"fx:{slug}-{k}" for f in g.fixtures):
                 k += 1
             g.fixtures.append(
-                Fixture(id=f"fx:{slug}-{k}", x=op.x, y=op.y, w=op.w, h=op.h, label=op.label)
+                Fixture(
+                    id=f"fx:{slug}-{k}",
+                    x=op.x,
+                    y=op.y,
+                    w=op.w,
+                    h=op.h,
+                    label=op.label,
+                    level=op.level or _default_level(g),
+                )
             )
         elif isinstance(op, ModifyFixture):
             fx = next((f for f in g.fixtures if f.id == op.fixture_id), None)
@@ -369,10 +406,39 @@ def apply_ops(geo: PlanGeometry, ops: list[Op]) -> OpsResult:
             else:
                 warnings.append(f"remove_fixture: index {op.index} out of range; skipped")
 
-    # rebuild walls from the mutated rooms, then re-home every opening
+    # rebuild walls from the mutated rooms, then place the deferred new openings onto the
+    # final walls (their wall ids/positions are only correct here), then re-home everything
     g.walls = derive_walls(g.rooms)
+    # scope re-homing per level like convert_v1/derive_walls: detached structures share a
+    # coord origin, so an opening must never re-home onto a different level's wall
+    room_level = {r.id: r.level for r in g.rooms}
+    walls_by_level: dict[str, list[Wall]] = {}
+    for wl in g.walls:
+        walls_by_level.setdefault(room_level.get(wl.a, DEFAULT_LEVEL), []).append(wl)
+    for wall_id, t0, t1, typ, oid in deferred_openings:
+        w = next((wl for wl in g.walls if wl.id == wall_id), None)
+        if w is None:
+            warnings.append(f"add_opening: wall '{wall_id}' no longer exists; skipped")
+            continue
+        abs_openings.append(
+            _AbsOpening(
+                vertical=w.vertical,
+                coord=w.coord,
+                lo=w.t_to_abs(t0),
+                hi=w.t_to_abs(t1),
+                type=typ,
+                id=oid,
+                level=room_level.get(w.a, DEFAULT_LEVEL),
+            )
+        )
     for a in abs_openings:
-        hit = locate_wall(g.walls, vertical=a.vertical, coord=a.coord, lo=a.lo, hi=a.hi)
+        hit = locate_wall(
+            walls_by_level.get(a.level, []),
+            vertical=a.vertical,
+            coord=a.coord,
+            lo=a.lo,
+            hi=a.hi,
+        )
         if hit is None:
             warnings.append(f"opening {a.id} ({a.type}) no longer sits on any wall; dropped")
             continue

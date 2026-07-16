@@ -104,9 +104,6 @@ export default function Inspector({
         </div>
       </div>
 
-      {selection.region && atHead && (
-        <RegionEditor key="region" region={selection.region} onOps={onOps} />
-      )}
       {room && atHead && (
         <RoomEditor
           key={room.id}
@@ -234,7 +231,7 @@ export default function Inspector({
               remove
             </button>
           </div>
-          <div className="note">Drag the handles on the plan to move its ends · Ctrl+C / Ctrl+V to copy.</div>
+          <div className="note">Drag the middle to slide it along the wall, or the end handles to resize · Ctrl+C / Ctrl+V to copy.</div>
         </div>
       )}
 
@@ -272,90 +269,6 @@ export default function Inspector({
         )}
       </div>
     </>
-  );
-}
-
-function RegionEditor({
-  region,
-  onOps,
-}: {
-  region: { x: number; y: number; w: number; h: number };
-  onOps: (ops: Op[]) => void;
-}) {
-  const [name, setName] = useState('BUTLERS PANTRY');
-  const [kind, setKind] = useState('storage');
-  return (
-    <div className="body inspector-pane">
-      <div className="what">
-        New room here <span className="chip">space</span>{' '}
-        <span className="chip dim">
-          {region.w.toFixed(1)} × {region.h.toFixed(1)}m
-        </span>
-      </div>
-      <div className="frow one">
-        <label className="f">
-          <span>Room name — Enter adds it</span>
-          <input
-            value={name}
-            autoFocus
-            onFocus={(e) => e.target.select()}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && name.trim()) {
-                e.preventDefault();
-                onOps([
-                  {
-                    op: 'add_room',
-                    name: name.trim(),
-                    kind,
-                    x: region.x,
-                    y: region.y,
-                    w: region.w,
-                    h: region.h,
-                    fill: kind === 'storage' || kind === 'utility' ? 'grey' : 'white',
-                  },
-                ]);
-              }
-            }}
-          />
-        </label>
-      </div>
-      <div className="frow">
-        <label className="f">
-          <span>Kind</span>
-          <select value={kind} onChange={(e) => setKind(e.target.value)}>
-            {KINDS.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <div className="btnrow">
-        <button
-          className="primary"
-          disabled={!name.trim()}
-          onClick={() =>
-            onOps([
-              {
-                op: 'add_room',
-                name: name.trim(),
-                kind,
-                x: region.x,
-                y: region.y,
-                w: region.w,
-                h: region.h,
-                fill: kind === 'storage' || kind === 'utility' ? 'grey' : 'white',
-              },
-            ])
-          }
-        >
-          Add room
-        </button>
-      </div>
-      <div className="note">Or describe what to build here to the agent below — the space is the target.</div>
-    </div>
   );
 }
 

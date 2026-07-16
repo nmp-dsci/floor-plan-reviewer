@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Any
 
 import httpx
@@ -105,6 +105,18 @@ def _job_running(db, review_id: str) -> bool:
         ).scalar_one_or_none()
         is not None
     )
+
+
+def _sandbox_seed_plan_id(db) -> str | None:
+    """The earliest non-sandbox plan with a review + v0 — the same plan
+    create_sandbox() clones. Golden-path E2E + Feature Checks depend on it existing."""
+    for plan in db.execute(
+        select(Plan).where(Plan.slug.not_like(f"{SANDBOX_PREFIX}%")).order_by(Plan.created_at)
+    ).scalars():
+        rev = db.execute(select(Review).where(Review.plan_id == plan.id)).scalars().first()
+        if rev and _versions(db, rev.id):
+            return plan.id
+    return None
 
 
 def _prune_unsaved(db, review_id: str, keep_n: int) -> list[int]:
@@ -287,9 +299,11 @@ async def _run_job(job_id: str, review_id: str, batch: CommentBatch) -> None:
         payload = resp.json()
 
         new_geo = PlanGeometry(**payload["geometry"])
-        new_geo.meta["envelope"] = PlanGeometry(**original.geometry).meta.get(
-            "envelope", new_geo.meta.get("envelope")
-        )
+        orig_meta = PlanGeometry(**original.geometry).meta
+        # the pinned footprint (per level) is immutable — always carry it from the original
+        new_geo.meta["envelope"] = orig_meta.get("envelope", new_geo.meta.get("envelope"))
+        new_geo.meta["envelopes"] = orig_meta.get("envelopes", new_geo.meta.get("envelopes"))
+        new_geo.meta["levels"] = orig_meta.get("levels", new_geo.meta.get("levels"))
         errors, warnings = validate(new_geo)
         if errors:
             raise RuntimeError("agent produced invalid geometry: " + "; ".join(errors[:4]))
@@ -365,12 +379,17 @@ class EditBatch(BaseModel):
     version_n: int
     ops: list[dict[str, Any]]
     title: str = ""
+    level: str = ""  # active level; new rooms/fixtures inherit it when the op omits one
 
 
 @app.post("/api/reviews/{review_id}/edits", status_code=201)
 def apply_edits(review_id: str, batch: EditBatch) -> dict[str, Any]:
     """Human edits: the same pipeline as the agent (apply_ops → validate → version),
     minus the LLM. Rent is carried unchanged and flagged for re-assessment."""
+    if batch.level:  # place new objects on the level the user is viewing
+        for raw in batch.ops:
+            if raw.get("op") in ("add_room", "add_fixture") and not raw.get("level"):
+                raw["level"] = batch.level
     try:
         ops = parse_ops(batch.ops)
     except Exception as exc:  # noqa: BLE001 — surface schema errors as 422
@@ -394,9 +413,10 @@ def apply_edits(review_id: str, batch: EditBatch) -> dict[str, Any]:
         head_geo = _geo(head)
         result = apply_ops(head_geo, ops)
         new_geo = result.geometry
-        new_geo.meta["envelope"] = _geo(versions[0]).meta.get(
-            "envelope", new_geo.meta.get("envelope")
-        )
+        orig_meta = _geo(versions[0]).meta
+        new_geo.meta["envelope"] = orig_meta.get("envelope", new_geo.meta.get("envelope"))
+        new_geo.meta["envelopes"] = orig_meta.get("envelopes", new_geo.meta.get("envelopes"))
+        new_geo.meta["levels"] = orig_meta.get("levels", new_geo.meta.get("levels"))
         errors, warnings = validate(new_geo)
         if errors:
             raise HTTPException(422, "; ".join(errors[:5]))
@@ -496,6 +516,42 @@ def plan_image(plan_id: str) -> FileResponse:
     return FileResponse(path, media_type=media)
 
 
+@app.delete("/api/plans/{plan_id}")
+def delete_plan(plan_id: str) -> dict[str, bool]:
+    """Remove a dead-draft plan and everything under it (review, versions, jobs,
+    uploaded image). The seed plan that create_sandbox() clones from, and any plan
+    with a queued/running agent job, are refused. Only files that live under
+    STORAGE_DIR are unlinked, so a seed image can never be removed."""
+    from pathlib import Path
+
+    with session() as db:
+        plan = db.get(Plan, plan_id)
+        if not plan:
+            raise HTTPException(404, "plan not found")
+        if plan.slug.startswith(SANDBOX_PREFIX):
+            raise HTTPException(403, "sandbox plans are managed automatically")
+        if plan.id == _sandbox_seed_plan_id(db):
+            raise HTTPException(409, "seed plan cannot be deleted")
+        reviews = db.execute(select(Review).where(Review.plan_id == plan_id)).scalars().all()
+        if any(_job_running(db, review.id) for review in reviews):
+            raise HTTPException(409, "plan has a running job")
+        for review in reviews:
+            for v in _versions(db, review.id):
+                db.delete(v)
+            for job in db.execute(select(Job).where(Job.review_id == review.id)).scalars():
+                db.delete(job)
+            db.flush()  # children before parents — order manually, no ORM cascade declared
+            db.delete(review)
+        image_path = plan.image_path
+        db.flush()
+        db.delete(plan)
+        db.commit()
+    if image_path and image_path.startswith(str(STORAGE_DIR)):
+        with suppress(OSError):
+            Path(image_path).unlink(missing_ok=True)
+    return {"deleted": True}
+
+
 # ---------- Feature Checks sandbox ----------
 
 
@@ -504,16 +560,19 @@ def create_sandbox() -> dict[str, str]:
     """Throwaway review (clone of the seed original) for the Feature Checks tab.
     Hidden from the library; deleted after the run and swept on startup."""
     with session() as db:
-        source = db.execute(
+        # clone the earliest real plan that has a review+v0 (the seed). Robust to
+        # extra uploads sitting in the library — never assume exactly one plan exists.
+        source = None
+        src_review = None
+        for plan in db.execute(
             select(Plan).where(Plan.slug.not_like(f"{SANDBOX_PREFIX}%")).order_by(Plan.created_at)
-        ).scalar_one_or_none()
-        if not source:
-            raise HTTPException(409, "no seed plan to clone")
-        src_review = db.execute(
-            select(Review).where(Review.plan_id == source.id)
-        ).scalar_one_or_none()
-        if not src_review:
-            raise HTTPException(409, "seed plan has no review")
+        ).scalars():
+            rev = db.execute(select(Review).where(Review.plan_id == plan.id)).scalars().first()
+            if rev and _versions(db, rev.id):
+                source, src_review = plan, rev
+                break
+        if not source or not src_review:
+            raise HTTPException(409, "no seed plan with a review to clone")
         v0 = _versions(db, src_review.id)[0]
         sandbox_id = uuid.uuid4().hex[:8]
         plan = Plan(slug=f"{SANDBOX_PREFIX}{sandbox_id}", address="[feature-checks sandbox]")
@@ -688,7 +747,10 @@ class ApproveIn(BaseModel):
 @app.post("/api/plans/{plan_id}/approve", status_code=201)
 def approve_plan(plan_id: str, body: ApproveIn) -> dict[str, str]:
     geo = PlanGeometry(**body.geometry)
+    # pin the immutable footprint per level (each structure/storey has its own origin)
     geo.meta["envelope"] = list(geo.envelope())
+    geo.meta["envelopes"] = {lid: list(geo.envelope_for(lid)) for lid in geo.level_ids()}
+    geo.meta["levels"] = geo.levels()
     errors, _ = validate(geo)
     if errors:
         raise HTTPException(422, "; ".join(errors[:5]))

@@ -4,8 +4,68 @@
 // are FIRST-CLASS EDITABLE — editing a pending object rewrites its op in place, so
 // no preview id ever reaches the server. One Apply commits the batch as one version.
 
-import type { Fixture, OpeningType, PlanGeometry, Wall } from './types';
-import { snapM, wallIsVertical } from './geometry';
+import type { Fixture, OpeningType, PlanGeometry, Room, Wall } from './types';
+import {
+  DEFAULT_LEVEL,
+  deriveWalls,
+  locateWall,
+  snapM,
+  tToAbs,
+  wallCoord,
+  wallIsVertical,
+} from './geometry';
+
+// An existing opening captured by absolute position (not wall id), so it can be re-homed
+// onto the re-derived walls the way the server (plan_core.ops.apply_ops) does. `level` is
+// the host structure — an opening only re-homes onto same-level walls.
+interface AbsOpening {
+  vertical: boolean;
+  coord: number;
+  lo: number;
+  hi: number;
+  type: OpeningType;
+  id: string;
+  level: string;
+}
+
+function snapshotOpenings(walls: Wall[], roomLevel: Map<string, string>): AbsOpening[] {
+  const out: AbsOpening[] = [];
+  for (const w of walls) {
+    for (const o of w.openings) {
+      out.push({
+        vertical: wallIsVertical(w),
+        coord: wallCoord(w),
+        lo: tToAbs(w, o.t0),
+        hi: tToAbs(w, o.t1),
+        type: o.type,
+        id: o.id,
+        level: roomLevel.get(w.a) ?? DEFAULT_LEVEL,
+      });
+    }
+  }
+  return out;
+}
+
+function rehomeOpenings(walls: Wall[], snapshot: AbsOpening[], roomLevel: Map<string, string>): void {
+  // scope per level like the server (plan_core.ops): detached structures share a coord
+  // origin, so an opening must never re-home onto a different level's wall
+  const wallsByLevel = new Map<string, Wall[]>();
+  for (const w of walls) {
+    const lv = roomLevel.get(w.a) ?? DEFAULT_LEVEL;
+    const arr = wallsByLevel.get(lv);
+    if (arr) arr.push(w);
+    else wallsByLevel.set(lv, [w]);
+  }
+  for (const a of snapshot) {
+    const hit = locateWall(wallsByLevel.get(a.level) ?? [], a.vertical, a.coord, a.lo, a.hi);
+    if (!hit) continue;
+    if (hit.wall.openings.some((o) => o.id === a.id)) continue;
+    hit.wall.openings.push({ id: a.id, type: a.type, t0: hit.t0, t1: hit.t1 });
+  }
+}
+
+// ops that change room rectangles → walls must be re-derived so the preview shows them moved
+const ROOM_GEOMETRY_OPS = new Set(['add_room', 'split_room', 'merge_rooms', 'remove_room', 'resize_room']);
 
 export type Op =
   | { op: 'rename'; room_id: string; name: string }
@@ -20,6 +80,7 @@ export type Op =
       w: number;
       h: number;
       fill?: 'white' | 'grey';
+      level?: string;
     }
   | {
       op: 'split_room';
@@ -36,7 +97,7 @@ export type Op =
   | { op: 'modify_opening'; opening_id: string; t0?: number; t1?: number; type?: OpeningType }
   | { op: 'remove_opening'; opening_id: string }
   | { op: 'remove_wall_chunk'; wall_id: string; t0: number; t1: number }
-  | { op: 'add_fixture'; x: number; y: number; w: number; h: number; label: string }
+  | { op: 'add_fixture'; x: number; y: number; w: number; h: number; label: string; level?: string }
   | {
       op: 'modify_fixture';
       fixture_id: string;
@@ -59,10 +120,16 @@ export const pvId = (pid: string): string => `pv-${pid}`;
 
 export const pidOfPv = (id: string): string | null => (id.startsWith('pv-') ? id.slice(3) : null);
 
-/** Optimistic local apply for the amber/green preview. Walls are NOT re-derived
- * (the server does that on apply); unknown ids are ignored rather than thrown. */
+/** Optimistic local apply for the amber/green preview. Walls ARE re-derived when a room
+ * rectangle changes (so a moved/added wall previews in its new spot, matching what the
+ * server will commit); unknown ids are ignored rather than thrown. */
 export function applyOpsPreview(geo: PlanGeometry, entries: PendingEntry[]): PlanGeometry {
   const g: PlanGeometry = structuredClone(geo);
+  // opening ops run in a second pass (after walls are re-derived) so they land on the walls
+  // the user sees — a room move/swap in the same batch renames the walls they sit on.
+  const openingEntries = entries.filter((e) =>
+    ['add_opening', 'remove_wall_chunk', 'modify_opening', 'remove_opening'].includes(e.op.op),
+  );
   for (const { pid, op } of entries) {
     switch (op.op) {
       case 'rename': {
@@ -103,6 +170,7 @@ export function applyOpsPreview(geo: PlanGeometry, entries: PendingEntry[]): Pla
           h: op.h,
           fill: op.fill ?? 'white',
           z: 0,
+          level: op.level ?? 'level-1',
         });
         break;
       case 'split_room': {
@@ -138,6 +206,7 @@ export function applyOpsPreview(geo: PlanGeometry, entries: PendingEntry[]): Pla
           h: created[3],
           fill: r.fill,
           z: r.z,
+          level: r.level,
         });
         break;
       }
@@ -161,31 +230,11 @@ export function applyOpsPreview(geo: PlanGeometry, entries: PendingEntry[]): Pla
       case 'remove_room':
         g.rooms = g.rooms.filter((r) => r.id !== op.room_id);
         break;
-      case 'add_opening': {
-        const w = g.walls.find((w) => w.id === op.wall_id);
-        if (w) w.openings.push({ id: pvId(pid), type: op.type, t0: op.t0, t1: op.t1 });
-        break;
-      }
-      case 'remove_wall_chunk': {
-        const w = g.walls.find((w) => w.id === op.wall_id);
-        if (w) w.openings.push({ id: pvId(pid), type: 'open', t0: op.t0, t1: op.t1 });
-        break;
-      }
-      case 'modify_opening': {
-        for (const w of g.walls) {
-          const o = w.openings.find((o) => o.id === op.opening_id);
-          if (o) {
-            if (op.t0 !== undefined) o.t0 = op.t0;
-            if (op.t1 !== undefined) o.t1 = op.t1;
-            if (op.type) o.type = op.type;
-          }
-        }
-        break;
-      }
+      // opening ops handled in the second pass below
+      case 'add_opening':
+      case 'remove_wall_chunk':
+      case 'modify_opening':
       case 'remove_opening':
-        for (const w of g.walls) {
-          w.openings = w.openings.filter((o) => o.id !== op.opening_id);
-        }
         break;
       case 'add_fixture': {
         const fx: Fixture = {
@@ -195,6 +244,7 @@ export function applyOpsPreview(geo: PlanGeometry, entries: PendingEntry[]): Pla
           w: op.w,
           h: op.h,
           label: op.label,
+          level: op.level ?? 'level-1',
         };
         g.fixtures.push(fx);
         break;
@@ -213,6 +263,80 @@ export function applyOpsPreview(geo: PlanGeometry, entries: PendingEntry[]): Pla
       case 'remove_fixture':
         g.fixtures = g.fixtures.filter((f) => f.id !== op.fixture_id);
         break;
+    }
+  }
+  // Openings mirror plan_core.ops.apply_ops. When a room op changes geometry the walls are
+  // re-derived, so existing openings are re-homed by ABSOLUTE POSITION (like the server), not
+  // carried by wall id — a swap or other topology-changing edit renames walls, and carry-by-id
+  // would silently drop the door even though the server keeps it. A modify_opening resolves its
+  // t0/t1 against the ORIGINAL host wall (before re-derivation) exactly like the server's
+  // geo.opening(), so a room op that resizes that host wall in the same batch can't shift it.
+  if (entries.some((e) => ROOM_GEOMETRY_OPS.has(e.op.op))) {
+    // level per room: original rooms for the snapshot (old walls may host a removed room),
+    // mutated rooms for the re-derived walls
+    const snapLevel = new Map(geo.rooms.map((r) => [r.id, r.level ?? DEFAULT_LEVEL]));
+    let snapshot = snapshotOpenings(g.walls, snapLevel);
+    // modify_opening / remove_opening act on the abs snapshot BEFORE re-derivation — modify
+    // against the ORIGINAL host wall's span, so re-homing lands it where the server commits.
+    for (const { op } of openingEntries) {
+      if (op.op === 'modify_opening') {
+        const a = snapshot.find((s) => s.id === op.opening_id);
+        const host = g.walls.find((w) => w.openings.some((o) => o.id === op.opening_id));
+        if (a && host) {
+          if (op.t0 !== undefined) a.lo = tToAbs(host, op.t0);
+          if (op.t1 !== undefined) a.hi = tToAbs(host, op.t1);
+          if (op.type) a.type = op.type;
+        }
+      } else if (op.op === 'remove_opening') {
+        snapshot = snapshot.filter((s) => s.id !== op.opening_id);
+      }
+    }
+    g.walls = deriveWalls(g.rooms);
+    const finalLevel = new Map(g.rooms.map((r) => [r.id, r.level ?? DEFAULT_LEVEL]));
+    rehomeOpenings(g.walls, snapshot, finalLevel);
+    // add_opening / remove_wall_chunk resolve against the re-derived walls (their ids are only
+    // correct here — a room move in the same batch renames the wall the user clicked).
+    for (const { pid, op } of openingEntries) {
+      if (op.op === 'add_opening') {
+        const w = g.walls.find((w) => w.id === op.wall_id);
+        if (w) w.openings.push({ id: pvId(pid), type: op.type, t0: op.t0, t1: op.t1 });
+      } else if (op.op === 'remove_wall_chunk') {
+        const w = g.walls.find((w) => w.id === op.wall_id);
+        if (w) w.openings.push({ id: pvId(pid), type: 'open', t0: op.t0, t1: op.t1 });
+      }
+    }
+  } else {
+    // walls unchanged: apply opening ops in place (matches the server — no wall length changes,
+    // so t0/t1 map to the same absolute span the server re-homes onto).
+    for (const { pid, op } of openingEntries) {
+      switch (op.op) {
+        case 'add_opening': {
+          const w = g.walls.find((w) => w.id === op.wall_id);
+          if (w) w.openings.push({ id: pvId(pid), type: op.type, t0: op.t0, t1: op.t1 });
+          break;
+        }
+        case 'remove_wall_chunk': {
+          const w = g.walls.find((w) => w.id === op.wall_id);
+          if (w) w.openings.push({ id: pvId(pid), type: 'open', t0: op.t0, t1: op.t1 });
+          break;
+        }
+        case 'modify_opening': {
+          for (const w of g.walls) {
+            const o = w.openings.find((o) => o.id === op.opening_id);
+            if (o) {
+              if (op.t0 !== undefined) o.t0 = op.t0;
+              if (op.t1 !== undefined) o.t1 = op.t1;
+              if (op.type) o.type = op.type;
+            }
+          }
+          break;
+        }
+        case 'remove_opening':
+          for (const w of g.walls) {
+            w.openings = w.openings.filter((o) => o.id !== op.opening_id);
+          }
+          break;
+      }
     }
   }
   return g;
@@ -385,6 +509,172 @@ export function wallMoveOps(
       { op: 'resize_room', room_id: bottom.id, x: bottom.x, y: snapM(bottom.y + d), w: bottom.w, h: snapM(bh) },
     ],
   };
+}
+
+// --- reflow-on-edit: dragging (move) or resizing a room pushes/pulls its direct
+// neighbours so the plan stays tiled (leading-edge rooms shrink, trailing-edge rooms
+// grow), rather than overlapping + leaving a gap. Each moved edge carries the neighbour
+// on it, like the wall-drag "trade space" idea. Hold Alt to bypass and edit freely.
+const REFLOW_ADJ = 0.35; // edges within this gap count as a shared wall (walls.py GAP_TOL)
+const REFLOW_MIN_SPAN = 0.3; // perpendicular overlap needed to count as a neighbour
+const reflowMinSide = (r: Room): number => (r.kind === 'storage' ? 0.45 : 0.7);
+
+interface EdgeNeighbours {
+  left: Room[];
+  right: Room[];
+  top: Room[];
+  bottom: Room[];
+}
+
+function edgeNeighbours(geo: PlanGeometry, room: Room): EdgeNeighbours {
+  const level = room.level ?? 'level-1';
+  const rx2 = room.x + room.w;
+  const ry2 = room.y + room.h;
+  const cells = geo.rooms.filter(
+    (r) => r.z === 0 && r.id !== room.id && !isPendingId(r.id) && (r.level ?? 'level-1') === level,
+  );
+  const xOverlap = (n: Room) => Math.min(n.x + n.w, rx2) - Math.max(n.x, room.x);
+  const yOverlap = (n: Room) => Math.min(n.y + n.h, ry2) - Math.max(n.y, room.y);
+  return {
+    top: cells.filter((n) => Math.abs(n.y + n.h - room.y) <= REFLOW_ADJ && xOverlap(n) >= REFLOW_MIN_SPAN),
+    bottom: cells.filter((n) => Math.abs(n.y - ry2) <= REFLOW_ADJ && xOverlap(n) >= REFLOW_MIN_SPAN),
+    left: cells.filter((n) => Math.abs(n.x + n.w - room.x) <= REFLOW_ADJ && yOverlap(n) >= REFLOW_MIN_SPAN),
+    right: cells.filter((n) => Math.abs(n.x - rx2) <= REFLOW_ADJ && yOverlap(n) >= REFLOW_MIN_SPAN),
+  };
+}
+
+/** Build resize ops for the room and its neighbours given how far each of the room's
+ * four edges moved (already clamped). A corner room may touch two edges. */
+function buildReflowOps(
+  room: Room,
+  s: EdgeNeighbours,
+  dLeft: number,
+  dRight: number,
+  dTop: number,
+  dBottom: number,
+): Op[] {
+  if (Math.abs(dLeft) + Math.abs(dRight) + Math.abs(dTop) + Math.abs(dBottom) < 1e-9) return [];
+  const adj = new Map<string, { x: number; y: number; w: number; h: number }>();
+  const at = (n: Room) => {
+    let r = adj.get(n.id);
+    if (!r) {
+      r = { x: n.x, y: n.y, w: n.w, h: n.h };
+      adj.set(n.id, r);
+    }
+    return r;
+  };
+  if (Math.abs(dLeft) > 1e-9) for (const n of s.left) at(n).w = n.w + dLeft;
+  if (Math.abs(dRight) > 1e-9)
+    for (const n of s.right) {
+      const r = at(n);
+      r.x = n.x + dRight;
+      r.w = n.w - dRight;
+    }
+  if (Math.abs(dTop) > 1e-9) for (const n of s.top) at(n).h = n.h + dTop;
+  if (Math.abs(dBottom) > 1e-9)
+    for (const n of s.bottom) {
+      const r = at(n);
+      r.y = n.y + dBottom;
+      r.h = n.h - dBottom;
+    }
+  const ops: Op[] = [
+    {
+      op: 'resize_room',
+      room_id: room.id,
+      x: snapM(room.x + dLeft),
+      y: snapM(room.y + dTop),
+      w: snapM(room.w + dRight - dLeft),
+      h: snapM(room.h + dBottom - dTop),
+    },
+  ];
+  for (const [id, r] of adj) {
+    ops.push({ op: 'resize_room', room_id: id, x: snapM(r.x), y: snapM(r.y), w: snapM(r.w), h: snapM(r.h) });
+  }
+  return ops;
+}
+
+/** Move a room: all four edges shift by (dx,dy); neighbours trade space. */
+export function roomMoveOps(geo: PlanGeometry, room: Room, dx: number, dy: number): Op[] {
+  const s = edgeNeighbours(geo, room);
+  // clamp the move so a shrinking (leading-edge) neighbour never drops below its min
+  if (dy < 0) for (const n of s.top) dy = Math.max(dy, reflowMinSide(n) - n.h);
+  if (dy > 0) for (const n of s.bottom) dy = Math.min(dy, n.h - reflowMinSide(n));
+  if (dx < 0) for (const n of s.left) dx = Math.max(dx, reflowMinSide(n) - n.w);
+  if (dx > 0) for (const n of s.right) dx = Math.min(dx, n.w - reflowMinSide(n));
+  dx = snapM(dx);
+  dy = snapM(dy);
+  return buildReflowOps(room, s, dx, dx, dy, dy);
+}
+
+/** Resize a room from its bottom-right corner (top-left anchored): only the right and
+ * bottom edges move by (dw,dh), so right/bottom neighbours trade space. */
+export function roomResizeOps(geo: PlanGeometry, room: Room, dw: number, dh: number): Op[] {
+  const s = edgeNeighbours(geo, room);
+  // growing into a neighbour shrinks it — clamp so it stays >= its min side
+  if (dw > 0) for (const n of s.right) dw = Math.min(dw, n.w - reflowMinSide(n));
+  if (dh > 0) for (const n of s.bottom) dh = Math.min(dh, n.h - reflowMinSide(n));
+  return buildReflowOps(room, s, 0, snapM(dw), 0, snapM(dh));
+}
+
+// A room and its neighbour count as the same "column"/"row" (a clean stack) when their
+// perpendicular extents line up — only then can they swap without disturbing anything else.
+const sameColumn = (a: Room, b: Room) =>
+  Math.abs(a.x - b.x) <= REFLOW_ADJ && Math.abs(a.x + a.w - (b.x + b.w)) <= REFLOW_ADJ;
+const sameRow = (a: Room, b: Room) =>
+  Math.abs(a.y - b.y) <= REFLOW_ADJ && Math.abs(a.y + a.h - (b.y + b.h)) <= REFLOW_ADJ;
+
+function swapVertical(room: Room, dy: number, s: EdgeNeighbours): Op[] | null {
+  const up = dy < 0;
+  const cands = up ? s.top : s.bottom;
+  if (cands.length !== 1 || !sameColumn(cands[0], room)) return null;
+  const n = cands[0];
+  const nMid = n.y + n.h / 2;
+  // swap once the dragged room's leading edge passes the neighbour's midpoint
+  const leadNew = up ? room.y + dy : room.y + room.h + dy;
+  if (up ? leadNew >= nMid : leadNew <= nMid) return null;
+  if (up) {
+    const gap = room.y - (n.y + n.h); // preserve the wall gap between them
+    return [
+      { op: 'resize_room', room_id: room.id, x: room.x, y: snapM(n.y), w: room.w, h: room.h },
+      { op: 'resize_room', room_id: n.id, x: n.x, y: snapM(n.y + room.h + gap), w: n.w, h: n.h },
+    ];
+  }
+  const gap = n.y - (room.y + room.h);
+  return [
+    { op: 'resize_room', room_id: n.id, x: n.x, y: room.y, w: n.w, h: n.h },
+    { op: 'resize_room', room_id: room.id, x: room.x, y: snapM(room.y + n.h + gap), w: room.w, h: room.h },
+  ];
+}
+
+function swapHorizontal(room: Room, dx: number, s: EdgeNeighbours): Op[] | null {
+  const leftward = dx < 0;
+  const cands = leftward ? s.left : s.right;
+  if (cands.length !== 1 || !sameRow(cands[0], room)) return null;
+  const n = cands[0];
+  const nMid = n.x + n.w / 2;
+  const leadNew = leftward ? room.x + dx : room.x + room.w + dx;
+  if (leftward ? leadNew >= nMid : leadNew <= nMid) return null;
+  if (leftward) {
+    const gap = room.x - (n.x + n.w);
+    return [
+      { op: 'resize_room', room_id: room.id, x: snapM(n.x), y: room.y, w: room.w, h: room.h },
+      { op: 'resize_room', room_id: n.id, x: snapM(n.x + room.w + gap), y: n.y, w: n.w, h: n.h },
+    ];
+  }
+  const gap = n.x - (room.x + room.w);
+  return [
+    { op: 'resize_room', room_id: n.id, x: room.x, y: n.y, w: n.w, h: n.h },
+    { op: 'resize_room', room_id: room.id, x: snapM(room.x + n.w + gap), y: room.y, w: room.w, h: room.h },
+  ];
+}
+
+/** Drop a dragged room: if it was dragged PAST a single aligned neighbour, swap the two
+ * (both keep their size, everything else stays put); otherwise reflow (trade space). */
+export function roomDropOps(geo: PlanGeometry, room: Room, dx: number, dy: number): Op[] {
+  const s = edgeNeighbours(geo, room);
+  const swap =
+    Math.abs(dy) >= Math.abs(dx) ? swapVertical(room, dy, s) : swapHorizontal(room, dx, s);
+  return swap ?? roomMoveOps(geo, room, dx, dy);
 }
 
 /** Object ids touched by pending ops — drawn with the amber "uncommitted" outline. */

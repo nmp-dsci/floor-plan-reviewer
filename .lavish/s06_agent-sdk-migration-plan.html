@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent SDK Migration Plan — Floor-Plan Studio</title>
+<style>
+:root{
+  --ink:#141416; --paper:#ffffff; --grey:#e1e1e3; --grey-2:#f4f4f5; --faint:#74747a;
+  --red:#e23d28; --green:#1a7f37; --green-bg:#e6f4ea; --red-bg:#fdecea;
+  --amber:#9a6700; --amber-bg:#fff3d6;
+  --mono:'SF Mono',ui-monospace,'Cascadia Code',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;min-width:0;}
+html,body{margin:0;}
+body{
+  background:var(--grey-2); color:var(--ink);
+  font-family:'Helvetica Neue',Arial,sans-serif; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px; margin:0 auto; padding:0 20px 96px;}
+.mono{font-family:var(--mono);}
+.up{color:var(--green);} .down{color:var(--red);}
+
+/* ---- masthead ---- */
+header.mast{border-bottom:4px solid var(--ink); padding:34px 0 18px; margin-bottom:26px;}
+.kicker{font-size:11.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--faint);}
+h1{margin:10px 0 6px; padding-bottom:3px; font-size:30px; letter-spacing:.01em; text-transform:uppercase; line-height:1.12; overflow-wrap:break-word;}
+.lede{font-size:15px; color:#333; max-width:72ch;}
+.metarow{display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;}
+.chip{
+  font-family:var(--mono); font-size:11px; border:2px solid var(--ink);
+  padding:4px 9px; background:var(--paper); display:inline-flex; gap:7px; align-items:baseline;
+}
+.chip b{letter-spacing:.02em;}
+.chip .k{color:var(--faint); text-transform:uppercase; letter-spacing:.08em; font-size:9.5px;}
+.chip.lock{border-color:var(--green); color:var(--green);}
+.chip.branch{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+
+/* ---- sections ---- */
+section{margin:40px 0 0;}
+.snum{font-family:var(--mono); font-size:12px; color:var(--red); font-weight:700;}
+h2{font-size:19px; letter-spacing:.06em; text-transform:uppercase; margin:6px 0 4px; border-bottom:3px solid var(--ink); padding-bottom:8px;}
+h3{font-size:13.5px; letter-spacing:.09em; text-transform:uppercase; margin:26px 0 10px; color:#222;}
+.note{font-size:13.5px; color:#333; max-width:76ch;}
+p{margin:10px 0;}
+
+/* ---- cards grid ---- */
+.grid{display:grid; gap:14px;}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));}
+.card{border:2px solid var(--ink); background:var(--paper); padding:14px 15px;}
+.card h4{margin:0 0 6px; font-size:12px; letter-spacing:.08em; text-transform:uppercase;}
+.card .body{font-size:13px; color:#333; overflow-wrap:anywhere;}
+.card.accent{border-left:6px solid var(--red);}
+.card.good{border-left:6px solid var(--green);}
+.card .path{font-family:var(--mono); font-size:11.5px; color:var(--faint); word-break:break-all;}
+
+/* ---- decision cards ---- */
+.decision{border:2px solid var(--green); background:var(--green-bg); padding:14px 15px;}
+.decision .k{font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--green); font-weight:700;}
+.decision .v{font-size:15px; font-weight:700; margin:4px 0 4px; letter-spacing:.01em;}
+.decision .why{font-size:12.5px; color:#2c4a35;}
+
+/* ---- tables ---- */
+.tablewrap{overflow-x:auto; border:2px solid var(--ink); background:var(--paper);}
+table{border-collapse:collapse; width:100%; min-width:560px; font-size:12.5px;}
+th,td{text-align:left; padding:9px 11px; border-bottom:1px solid var(--grey); vertical-align:top;}
+thead th{background:var(--ink); color:var(--paper); text-transform:uppercase; letter-spacing:.08em; font-size:10px; position:sticky; top:0;}
+tbody tr:last-child td{border-bottom:none;}
+td.mono,th.mono{font-family:var(--mono); font-size:11.5px;}
+.tag{display:inline-block; font-family:var(--mono); font-size:10px; padding:1px 6px; border:1.5px solid var(--ink); text-transform:uppercase; letter-spacing:.04em; white-space:nowrap;}
+.tag.red{border-color:var(--red); color:var(--red);}
+.tag.grn{border-color:var(--green); color:var(--green);}
+.tag.amb{border-color:var(--amber); color:var(--amber);}
+
+/* ---- phases ---- */
+.phase{border:2px solid var(--ink); background:var(--paper); margin:12px 0; display:grid; grid-template-columns:64px minmax(0,1fr); }
+.phase .n{background:var(--ink); color:var(--paper); font-family:var(--mono); font-weight:700; font-size:20px; display:flex; align-items:center; justify-content:center;}
+.phase .pb{padding:12px 15px;}
+.phase h4{margin:0 0 5px; font-size:13px; letter-spacing:.05em; text-transform:uppercase;}
+.phase .files{font-family:var(--mono); font-size:11px; color:var(--faint); margin:6px 0; word-break:break-word;}
+.phase .acc{font-size:12px; color:#2c4a35; border-left:3px solid var(--green); padding-left:9px; margin-top:8px;}
+
+/* ---- diagram ---- */
+.diagrow{display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); align-items:start;}
+.dcard{border:2px solid var(--ink); background:var(--paper);}
+.dcard .dt{font-size:11px; letter-spacing:.1em; text-transform:uppercase; padding:9px 12px; border-bottom:2px solid var(--ink); font-weight:700; display:flex; justify-content:space-between; gap:8px;}
+.dcard.now .dt{color:var(--red);}
+.dcard.tgt .dt{color:var(--green);}
+.dcard .mermaid{padding:12px; overflow-x:auto;}
+
+/* ---- code ---- */
+.codeblock{margin:16px 0;}
+.codehdr{display:flex; gap:10px; flex-wrap:wrap; align-items:baseline; border:2px solid var(--ink); border-bottom:none; background:var(--ink); color:var(--paper); padding:8px 12px;}
+.codehdr .cp{font-family:var(--mono); font-size:12px; font-weight:700;}
+.codehdr .cl{font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#b9b9c0;}
+.codehdr .cwhy{font-size:11.5px; color:#d8d8dc; margin-left:auto;}
+.diffhost{border:2px solid var(--ink); background:var(--paper); overflow-x:auto;}
+.diffhost :is(.pierre-file,.pierre-diff){font-size:12px;}
+
+/* ---- callouts ---- */
+.callout{border:2px solid var(--amber); background:var(--amber-bg); padding:12px 14px; margin:14px 0; font-size:13px;}
+.callout b{color:var(--amber);}
+.callout.warn{border-color:var(--red); background:var(--red-bg);}
+.callout.warn b{color:var(--red);}
+.callout.info{border-color:var(--ink); background:var(--paper);}
+.callout.info b{color:var(--ink);}
+
+/* ---- setup terminal ---- */
+.term{background:var(--ink); color:#e9e9ec; font-family:var(--mono); font-size:12.5px; padding:14px 16px; border:2px solid var(--ink); overflow-x:auto;}
+.term .c{color:#7ee2a8;} .term .p{color:#8b8b93;} .term .h{color:#8b8b93;}
+
+ul.tight{margin:8px 0; padding-left:20px;} ul.tight li{margin:5px 0; font-size:13px;}
+code.i{font-family:var(--mono); font-size:.9em; background:var(--grey-2); border:1px solid var(--grey); padding:0 4px;}
+.foot{margin-top:56px; border-top:3px solid var(--ink); padding-top:14px; font-size:12px; color:var(--faint); font-family:var(--mono);}
+a{color:var(--red);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <div class="kicker">Floor-Plan Studio · Technical Plan · Pre-implementation review · rev-B</div>
+  <h1>Run the app on your Claude subscription via the Agent SDK</h1>
+  <p class="lede">Re-scoped from the raw API. Replace Pydantic&nbsp;AI + DeepSeek in the <b>plan-agent</b> service with the
+  <b>Claude Agent SDK</b> (<code class="i">claude-agent-sdk</code>), authenticated by your <b>Claude subscription</b>
+  (<span class="mono">CLAUDE_CODE_OAUTH_TOKEN</span> from <span class="mono">claude setup-token</span>) — no paid API key.
+  Structured JSON stays intact via the SDK's <span class="mono">output_format</span> json-schema.</p>
+  <div class="metarow">
+    <span class="chip branch"><span class="k">branch</span><b class="mono">agent-sdk</b></span>
+    <span class="chip lock"><span class="k">auth</span><b>subscription token</b></span>
+    <span class="chip lock"><span class="k">sdk</span><b class="mono">claude-agent-sdk</b></span>
+    <span class="chip lock"><span class="k">model</span><b class="mono">claude-opus-4-8</b></span>
+    <span class="chip"><span class="k">scope</span><b>1 service · 3 call sites</b></span>
+  </div>
+</header>
+
+<div class="callout warn">
+  <b>Why this replaces the API-key plan.</b> The raw <span class="mono">anthropic</span> SDK (<span class="mono">messages.parse</span>)
+  can only bill a paid API key — a subscription can't power it. The <b>Agent SDK wraps the Claude Code CLI</b>, so it accepts a
+  subscription OAuth token. Trade-off: you're now bound by <b>subscription rate limits</b> (Pro is tight — Max recommended), and the app
+  is effectively <b>single-tenant per token</b> (§7). This is the right shape only because the app runs locally on your PC.
+</div>
+
+<!-- ============ 0. SETUP ============ -->
+<section id="setup" style="margin-top:26px">
+  <div class="snum">00</div>
+  <h2>One-time — mint your subscription token</h2>
+  <p class="note">Do this once on the machine that runs the app. The token is a 1-year, inference-only OAuth credential tied to your
+  Pro/Max plan.</p>
+  <div class="term" style="margin-top:12px">
+<span class="c">claude setup-token</span>                       <span class="h"># OAuth via your Pro/Max login → prints a 1-year token</span>
+<span class="c">export CLAUDE_CODE_OAUTH_TOKEN=&lt;token&gt;</span>   <span class="h"># paste into app/.env (gitignored)</span>
+<span class="c">unset ANTHROPIC_API_KEY</span>                  <span class="h"># CRITICAL: it outranks the token &amp; bills API credits</span>
+  </div>
+  <div class="callout info" style="margin-top:12px">
+    <b>Credential precedence (from Claude Code docs):</b> cloud&nbsp;provider → <span class="mono">ANTHROPIC_AUTH_TOKEN</span> →
+    <span class="mono">ANTHROPIC_API_KEY</span> → <span class="mono">apiKeyHelper</span> → <span class="mono">CLAUDE_CODE_OAUTH_TOKEN</span> →
+    <span class="mono">/login</span> subscription. The token is near the bottom, so <b>any stray API key wins</b> — the app would
+    silently bill credits instead of your subscription. The plan's health check surfaces which is active.
+  </div>
+</section>
+
+<!-- ============ 1. GOAL ============ -->
+<section id="goal">
+  <div class="snum">01</div>
+  <h2>Goal &amp; what changes</h2>
+  <p class="note">Collapse the provider-pluggable Pydantic&nbsp;AI stack to a single path: the <b>Claude Agent SDK</b>, run
+  <b>tool-free and single-turn</b> as a structured-extraction call. The geometry contract, validated op pipeline,
+  <span class="mono">echo</span> fallback, backend, and frontend are untouched — only the three LLM call sites and their auth change.</p>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card good">
+      <h4>In scope</h4>
+      <div class="body">
+      <ul class="tight" style="padding-left:18px">
+        <li>Swap Pydantic&nbsp;AI <span class="mono">Agent</span> → <span class="mono">claude_agent_sdk.query()</span> at all 3 sites</li>
+        <li>Structured JSON via <span class="mono">output_format={json_schema}</span> → <span class="mono">ResultMessage.structured_output</span></li>
+        <li>Vision image passed as a base64 content block (streaming prompt)</li>
+        <li>Remove DeepSeek/OpenAI + <span class="mono">pydantic-ai-slim</span>; add <span class="mono">claude-agent-sdk</span></li>
+        <li>Auth on <span class="mono">CLAUDE_CODE_OAUTH_TOKEN</span>; clear error when absent</li>
+        <li>Tool-free, <span class="mono">max_turns=1</span> — behaves like one structured LLM call</li>
+        <li>Update env, compose, Dockerfile, health, docs, spec D5</li>
+      </ul>
+      </div>
+    </div>
+    <div class="card accent">
+      <h4>Explicitly untouched</h4>
+      <div class="body">
+      <ul class="tight" style="padding-left:18px">
+        <li>plan-core geometry, ops, validator, compliance</li>
+        <li>backend-api (still calls agent over HTTP), Postgres, seed</li>
+        <li>frontend — never talked to a model directly</li>
+        <li>The validator bounce-back retry loop &amp; prompt wording (parity)</li>
+        <li><span class="mono">AGENT_MODE=echo</span> LLM-free path</li>
+        <li>Tavily search (only the extraction step becomes Claude)</li>
+      </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. DECISIONS ============ -->
+<section id="decisions">
+  <div class="snum">02</div>
+  <h2>Decisions locked</h2>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="decision">
+      <div class="k">Credential delivery</div>
+      <div class="v">Operator env var — subscription token</div>
+      <div class="why">A single <span class="mono">CLAUDE_CODE_OAUTH_TOKEN</span> set in app/.env / compose. Same env-var
+      delivery model as before, new credential type. "Others" bring their own by running <span class="mono">claude setup-token</span>
+      against <em>their</em> Pro/Max subscription — one token per operator.</div>
+    </div>
+    <div class="decision">
+      <div class="k">Model strategy</div>
+      <div class="v"><span class="mono">claude-opus-4-8</span> everywhere</div>
+      <div class="why">Set via <span class="mono">ClaudeAgentOptions(model=…)</span> on every call. Subject to your plan tier's
+      Opus access &amp; limits — env-overridable to Sonnet if you hit caps. No per-token API billing; usage draws on your
+      subscription quota.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. CURRENT STATE ============ -->
+<section id="current">
+  <div class="snum">03</div>
+  <h2>Current state — the three call sites</h2>
+  <p class="note">All LLM usage lives in <span class="mono">app/services/plan-agent/</span>. Each site builds a
+  Pydantic&nbsp;AI <span class="mono">Agent(model, output_type=…)</span> and calls <span class="mono">agent.run()</span>.
+  The backend reaches them over HTTP; nothing else in the app calls a model.</p>
+  <div class="tablewrap" style="margin-top:14px">
+    <table>
+      <thead><tr><th>Call site</th><th>Purpose</th><th class="mono">output_type</th><th>Model today</th><th>Env var</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">agent.py</td>
+          <td>Owner comments → typed geometry ops. Validator bounce-back, up to 3 attempts. Has <span class="mono">echo</span> mode.</td>
+          <td class="mono">OpsPlan</td>
+          <td class="mono">deepseek:<br>deepseek-chat</td>
+          <td class="mono">PLAN_AGENT_MODEL</td>
+        </tr>
+        <tr>
+          <td class="mono">comps.py</td>
+          <td>Tavily search results → structured rent comparables.</td>
+          <td class="mono">CompsList</td>
+          <td class="mono">deepseek:<br>deepseek-chat</td>
+          <td class="mono">PLAN_AGENT_MODEL</td>
+        </tr>
+        <tr>
+          <td class="mono">ingest.py</td>
+          <td>Floor-plan image → schema-v2 geometry draft (multimodal).</td>
+          <td class="mono">DraftPlan</td>
+          <td class="mono">anthropic:<br>claude-opus-4-8</td>
+          <td class="mono">VISION_MODEL</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Request flow — before &amp; after</h3>
+  <div class="diagrow">
+    <div class="dcard now">
+      <div class="dt"><span>Now</span><span class="mono">pydantic-ai · API keys</span></div>
+      <div class="mermaid">
+flowchart TB
+  FE["Frontend<br/>(no model calls)"] --> BE["backend-api<br/>HTTP: /apply /ingest /comps"]
+  BE --> AG["plan-agent (FastAPI)"]
+  AG --> PA{{"Pydantic AI<br/>Agent(output_type=…)"}}
+  PA -->|"ops · comps"| DS["DeepSeek<br/>deepseek-chat"]
+  PA -->|"vision"| AN["Anthropic API<br/>claude-opus-4-8"]
+  DS -. "DEEPSEEK_API_KEY" .-> KEY1[(paid keys)]
+  AN -. "ANTHROPIC_API_KEY" .-> KEY1
+      </div>
+    </div>
+    <div class="dcard tgt">
+      <div class="dt"><span>Target</span><span class="mono">agent sdk · subscription</span></div>
+      <div class="mermaid">
+flowchart TB
+  FE2["Frontend<br/>(no model calls)"] --> BE2["backend-api<br/>HTTP: /apply /ingest /comps"]
+  BE2 --> AG2["plan-agent (FastAPI)"]
+  AG2 --> LLM{{"llm.py<br/>parse_structured()"}}
+  LLM --> SDK["claude_agent_sdk.query()<br/>output_format=json_schema"]
+  SDK --> CLI["bundled Claude Code CLI<br/>(no Node needed)"]
+  CLI -->|"ops · comps · vision"| OP["claude-opus-4-8"]
+  CLI -. "CLAUDE_CODE_OAUTH_TOKEN" .-> SUB[(your subscription)]
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. APPROACH ============ -->
+<section id="approach">
+  <div class="snum">04</div>
+  <h2>Proposed approach</h2>
+  <p class="note">One shared module — <span class="mono">llm.py</span> — owns the SDK call, the auth guard, model config, and a single
+  <span class="mono">parse_structured()</span> helper that runs <span class="mono">query()</span> tool-free / single-turn and returns a
+  validated Pydantic model from <span class="mono">structured_output</span>. The three call sites stay thin; the domain
+  bounce-back loop is untouched.</p>
+
+  <h3>New file — the single LLM entry point</h3>
+  <div class="codeblock">
+    <div class="codehdr">
+      <span class="cp">app/services/plan-agent/src/plan_agent/llm.py</span>
+      <span class="cl">python · new</span>
+      <span class="cwhy">query() + auth guard + structured-output helper</span>
+    </div>
+    <div class="diffhost" id="host-llm"></div>
+  </div>
+
+  <h3>Vision ingest — image block via the streaming prompt</h3>
+  <div class="codeblock">
+    <div class="codehdr">
+      <span class="cp">plan_agent/ingest.py</span>
+      <span class="cl">python · diff (excerpt)</span>
+      <span class="cwhy">b64 passes straight into a user content block</span>
+    </div>
+    <div class="diffhost" id="host-ingest"></div>
+  </div>
+
+  <h3>Ops loop — same bounce-back, new call</h3>
+  <p class="note">Only the model call inside the retry loop changes. The <span class="mono">validate()</span> →
+  feedback → retry logic, <span class="mono">_package()</span>, compliance flags, and <span class="mono">_echo_plan()</span> stay
+  byte-for-byte — geometry quality is still governed by the same loop, only the engine moves to your subscription.</p>
+  <div class="codeblock">
+    <div class="codehdr">
+      <span class="cp">plan_agent/agent.py</span>
+      <span class="cl">python · diff (excerpt)</span>
+      <span class="cwhy">get_agent() deleted; one line in the loop swapped</span>
+    </div>
+    <div class="diffhost" id="host-agent"></div>
+  </div>
+
+  <h3>Comps extraction</h3>
+  <div class="codeblock">
+    <div class="codehdr">
+      <span class="cp">plan_agent/comps.py</span>
+      <span class="cl">python · diff (excerpt)</span>
+      <span class="cwhy">Tavily unchanged; extraction becomes a parse_structured call</span>
+    </div>
+    <div class="diffhost" id="host-comps"></div>
+  </div>
+
+  <h3>Auth, config &amp; deps</h3>
+  <div class="grid g2">
+    <div class="codeblock" style="margin:0">
+      <div class="codehdr"><span class="cp">pyproject.toml</span><span class="cl">diff</span></div>
+      <div class="diffhost" id="host-pyproject"></div>
+    </div>
+    <div class="codeblock" style="margin:0">
+      <div class="codehdr"><span class="cp">.env.example</span><span class="cl">diff</span></div>
+      <div class="diffhost" id="host-env"></div>
+    </div>
+    <div class="codeblock" style="margin:0">
+      <div class="codehdr"><span class="cp">docker-compose.yml</span><span class="cl">diff</span></div>
+      <div class="diffhost" id="host-compose"></div>
+    </div>
+    <div class="codeblock" style="margin:0">
+      <div class="codehdr"><span class="cp">plan_agent/main.py</span><span class="cl">diff · /health</span></div>
+      <div class="diffhost" id="host-main"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. MAPPING ============ -->
+<section id="mapping">
+  <div class="snum">05</div>
+  <h2>The translation, precisely</h2>
+  <p class="note">The existing <span class="mono">OpsPlan</span> / <span class="mono">CompsList</span> / <span class="mono">DraftPlan</span>
+  Pydantic models are reused — their <span class="mono">.model_json_schema()</span> becomes the SDK's <span class="mono">output_format</span>
+  schema, and <span class="mono">structured_output</span> is re-validated back into the model.</p>
+  <div class="tablewrap" style="margin-top:14px">
+    <table>
+      <thead><tr><th>Concern</th><th>Pydantic AI (now)</th><th>Claude Agent SDK (target)</th></tr></thead>
+      <tbody>
+        <tr><td>Structured result</td><td class="mono">Agent(m, output_type=T)<br>→ run.output</td><td class="mono">options.output_format={json_schema:<br>T.model_json_schema()} → ResultMessage.<br>structured_output → T.model_validate(…)</td></tr>
+        <tr><td>System prompt</td><td class="mono">instructions=SYSTEM</td><td class="mono">ClaudeAgentOptions(system_prompt=SYSTEM)</td></tr>
+        <tr><td>User prompt</td><td class="mono">agent.run("…")</td><td class="mono">query(prompt=&lt;stream yielding<br>{"type":"user","message":…}&gt;)</td></tr>
+        <tr><td>Image input</td><td class="mono">BinaryContent(data=bytes, media_type)</td><td class="mono">content block {"type":"image","source":<br>{"type":"base64",media_type,data:b64}}</td></tr>
+        <tr><td>Keep it a single call</td><td>implicit</td><td class="mono">allowed_tools=[], max_turns=1</td></tr>
+        <tr><td>Domain-error retries</td><td colspan="2">unchanged — the app's own <span class="mono">validate()</span> bounce-back loop wraps the call at both</td></tr>
+        <tr><td>Model</td><td class="mono">"anthropic:claude-opus-4-8"</td><td class="mono">model="claude-opus-4-8"</td></tr>
+        <tr><td>Auth</td><td class="mono">DEEPSEEK_API_KEY / ANTHROPIC_API_KEY</td><td class="mono">CLAUDE_CODE_OAUTH_TOKEN (subscription)</td></tr>
+        <tr><td>Runtime dep</td><td>provider HTTP</td><td>bundled Claude Code CLI subprocess (no Node)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">
+    <b>No thinking/effort knobs.</b> Those are raw-API parameters; the Agent SDK abstracts them behind the Claude Code harness.
+    The levers here are <span class="mono">model</span>, <span class="mono">system_prompt</span>, and <span class="mono">max_turns</span>.
+    Running <span class="tag">tool-free</span> <span class="tag">max_turns=1</span> makes each call behave like a single structured
+    completion — no filesystem or bash access.
+  </div>
+</section>
+
+<!-- ============ 6. PHASES ============ -->
+<section id="phases">
+  <div class="snum">06</div>
+  <h2>Work phases</h2>
+  <p class="note">Ordered so the app stays runnable after each phase. Phase 1 carries the two make-or-break probes
+  (§8) before any call-site edits.</p>
+
+  <div class="phase"><div class="n">1</div><div class="pb">
+    <h4>Dependency swap + <span class="mono">llm.py</span> + probes</h4>
+    <div class="files">pyproject.toml · src/plan_agent/llm.py (new) · uv.lock</div>
+    <div class="note" style="font-size:12.5px">Remove <span class="mono">pydantic-ai-slim</span>, add <span class="mono">claude-agent-sdk</span>.
+    Write the auth guard, model config, and <span class="mono">parse_structured()</span>. Run the <b>Op-union schema probe</b> and the
+    <b>subscription-auth probe</b> (§8).</div>
+    <div class="acc">Accept: <span class="mono">uv sync</span> clean · a probe <span class="mono">query()</span> returns a valid OpsPlan on the subscription token · <span class="mono">mypy</span> passes.</div>
+  </div></div>
+
+  <div class="phase"><div class="n">2</div><div class="pb">
+    <h4>Migrate vision ingest</h4>
+    <div class="files">src/plan_agent/ingest.py</div>
+    <div class="note" style="font-size:12.5px">Drop <span class="mono">Agent</span>/<span class="mono">BinaryContent</span>; call <span class="mono">parse_structured(DraftPlan, …, image=…)</span>.
+    Move <span class="mono">VISION_MODEL</span> to llm.py.</div>
+    <div class="acc">Accept: <span class="mono">/ingest</span> returns geometry from a real plan image on the subscription.</div>
+  </div></div>
+
+  <div class="phase"><div class="n">3</div><div class="pb">
+    <h4>Migrate ops loop</h4>
+    <div class="files">src/plan_agent/agent.py</div>
+    <div class="note" style="font-size:12.5px">Replace <span class="mono">get_agent()</span>/<span class="mono">agent.run</span> with the helper inside the unchanged bounce-back loop.
+    Move <span class="mono">MODEL</span>/<span class="mono">AGENT_MODE</span> to llm.py; keep <span class="mono">echo</span>.</div>
+    <div class="acc">Accept: <span class="mono">/apply</span> yields validator-clean ops · <span class="mono">echo</span> still works with no token.</div>
+  </div></div>
+
+  <div class="phase"><div class="n">4</div><div class="pb">
+    <h4>Migrate comps</h4>
+    <div class="files">src/plan_agent/comps.py</div>
+    <div class="note" style="font-size:12.5px">Extraction step → <span class="mono">parse_structured(CompsList, …)</span>. Tavily call untouched.</div>
+    <div class="acc">Accept: <span class="mono">/comps</span> returns structured comps (or the graceful "no token / no results" note).</div>
+  </div></div>
+
+  <div class="phase"><div class="n">5</div><div class="pb">
+    <h4>Auth &amp; container wiring</h4>
+    <div class="files">.env.example · docker-compose.yml · services/plan-agent/Dockerfile · main.py (/health)</div>
+    <div class="note" style="font-size:12.5px">Remove <span class="mono">DEEPSEEK_API_KEY</span>/<span class="mono">ANTHROPIC_API_KEY</span>; pass <span class="mono">CLAUDE_CODE_OAUTH_TOKEN</span>;
+    <b>verify the bundled CLI runs in the container image</b>; re-point <span class="mono">main.py</span> imports; add <span class="mono">auth</span> to /health.</div>
+    <div class="acc">Accept: <span class="mono">make -C app up</span> healthy · <span class="mono">/health</span> shows models + <span class="mono">auth:true</span> · no <span class="mono">ANTHROPIC_API_KEY</span> in the container env.</div>
+  </div></div>
+
+  <div class="phase"><div class="n">6</div><div class="pb">
+    <h4>Docs &amp; spec</h4>
+    <div class="files">AGENTS.md (D5, roadmap #6) · CLAUDE.md · pyproject description · ai_specs/s01…md · README</div>
+    <div class="note" style="font-size:12.5px">Record that decision <b>D5 is revised</b>: pluggable DeepSeek → Claude Agent SDK on a subscription token; document <span class="mono">setup-token</span>.</div>
+    <div class="acc">Accept: no remaining "DeepSeek"/"Pydantic AI"/"API key" references in app docs; setup-token flow documented.</div>
+  </div></div>
+
+  <div class="phase"><div class="n">7</div><div class="pb">
+    <h4>Verify &amp; ship</h4>
+    <div class="files">tests · make test · make smoke</div>
+    <div class="note" style="font-size:12.5px">Unit tests for the helper (mock <span class="mono">query</span>) + echo-no-token path; live smoke of all three endpoints on a real token; then <span class="mono">/no-mistakes</span> → PR into main.</div>
+    <div class="acc">Accept: <span class="mono">make -C app test</span> &amp; <span class="mono">smoke</span> green; live 3-endpoint pass on the subscription.</div>
+  </div></div>
+</section>
+
+<!-- ============ 7. RISKS ============ -->
+<section id="risks">
+  <div class="snum">07</div>
+  <h2>Risks &amp; mitigations</h2>
+  <div class="tablewrap" style="margin-top:14px">
+    <table>
+      <thead><tr><th>Risk</th><th>Sev</th><th>Why</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Op-union schema</b> rejected by <span class="mono">output_format</span></td>
+          <td><span class="tag red">high</span></td>
+          <td><span class="mono">OpsPlan.ops</span> is <span class="mono">list[Op]</span>, a discriminated union. <span class="mono">model_json_schema()</span> emits <span class="mono">$defs</span>/<span class="mono">anyOf</span>; json-schema validation may reject recursion/refs.</td>
+          <td>Probe first (phase 1). If rejected: flatten the schema, or drop <span class="mono">output_format</span> and prompt for JSON in the system prompt + parse the final text block (the same models still validate it).</td>
+        </tr>
+        <tr>
+          <td><b>Subscription rate limits</b></td>
+          <td><span class="tag red">high</span></td>
+          <td>Ops loop (≤3 attempts) + vision + comps per review iteration draw on your plan quota. <b>Pro throttles quickly</b>; a busy session can stall.</td>
+          <td>Use <b>Max</b> for real use. Keep comps/ops on Opus only if quota allows; env-override to Sonnet to stretch limits. Surface 429/limit errors from the SDK as clear 502s.</td>
+        </tr>
+        <tr>
+          <td><span class="mono">ANTHROPIC_API_KEY</span> precedence trap</td>
+          <td><span class="tag amb">med</span></td>
+          <td>If any API key is set in the env, it <b>silently overrides</b> the subscription token and bills API credits.</td>
+          <td>Ensure it's unset in shell, .env, and the container. <span class="mono">/health</span> reports which credential is active; add a startup warning if a key is present.</td>
+        </tr>
+        <tr>
+          <td>Bundled CLI in the Docker image</td>
+          <td><span class="tag amb">med</span></td>
+          <td><span class="mono">pip install claude-agent-sdk</span> bundles the CLI, but the binary must run in the slim-python linux image (glibc/arch).</td>
+          <td>Verify at build (phase 5). Fallbacks: <span class="mono">curl … install.sh</span> in the Dockerfile, or set <span class="mono">ClaudeAgentOptions(cli_path=…)</span>.</td>
+        </tr>
+        <tr>
+          <td>Token expiry / terms</td>
+          <td><span class="tag grn">low</span></td>
+          <td>Token lasts ~1 year, inference-only. Automated subscription use has terms limits.</td>
+          <td>Re-run <span class="mono">claude setup-token</span> to renew; health surfaces expiry failures. Personal local use is within the token's intent — flag anything beyond.</td>
+        </tr>
+        <tr>
+          <td>Latency / subprocess</td>
+          <td><span class="tag grn">low</span></td>
+          <td><span class="mono">query()</span> spawns the CLI subprocess per call.</td>
+          <td>Backend <span class="mono">/apply</span> already uses a 600s timeout. Small structured outputs → acceptable; a pooled <span class="mono">ClaudeSDKClient</span> is a later optimisation.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 8. VERIFY ============ -->
+<section id="verify">
+  <div class="snum">08</div>
+  <h2>Verification</h2>
+  <div class="grid g3" style="margin-top:14px">
+    <div class="card accent">
+      <h4>1 · Schema probe</h4>
+      <div class="body">Before editing call sites, run one <span class="mono">query()</span> with
+      <span class="mono">output_format={schema: OpsPlan.model_json_schema()}</span> and confirm a valid
+      <span class="mono">structured_output</span> comes back — the make-or-break unknown (the <span class="mono">Op</span> union).</div>
+    </div>
+    <div class="card accent">
+      <h4>2 · Subscription auth probe</h4>
+      <div class="body">Same probe on a real <span class="mono">CLAUDE_CODE_OAUTH_TOKEN</span> with <span class="mono">ANTHROPIC_API_KEY</span>
+      unset — confirms structured output works through the subscription path, not just an API key, and that Opus is available on your tier.</div>
+    </div>
+    <div class="card accent">
+      <h4>3 · Unit + live smoke</h4>
+      <div class="body">Mock <span class="mono">query</span> for message shape + echo-no-token path (<span class="mono">make test</span>); then live
+      <span class="mono">/ingest</span>, <span class="mono">/apply</span>, <span class="mono">/comps</span> on the subscription + <span class="mono">make smoke</span>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 9. NON-GOALS ============ -->
+<section id="nongoals">
+  <div class="snum">09</div>
+  <h2>Non-goals (this change)</h2>
+  <ul class="tight">
+    <li><b>Multi-tenant per-user subscriptions.</b> Each operator supplies their own <span class="mono">CLAUDE_CODE_OAUTH_TOKEN</span>; the app doesn't broker distinct users' subscriptions in one process.</li>
+    <li><b>The raw <span class="mono">anthropic</span> API path.</b> Superseded — it can't use a subscription. (Kept as an env-swap fallback only if you later want pay-per-token.)</li>
+    <li><b>Streaming to the frontend.</b> Outputs are small structured objects.</li>
+    <li><b>Pooled/session-reuse SDK client.</b> A later latency optimisation; v1 uses a fresh <span class="mono">query()</span> per request.</li>
+    <li><b>Claude Code's built-in tools</b> (Read/Bash/Edit). Deliberately disabled — this is a structured-extraction call, not a coding agent.</li>
+  </ul>
+  <div class="callout warn" style="margin-top:16px">
+    <b>Open question for you.</b> The app spec (<span class="mono">ai_specs/s01…md</span>) records decision <b>D5</b> as
+    "pluggable LLM — DeepSeek default." This migration supersedes it (Agent SDK + subscription). Rewrite D5 in place with a changelog
+    note, or keep D5 and add a superseding entry? Annotate your preference and I'll fold it into phase&nbsp;6.
+  </div>
+</section>
+
+<div class="foot">
+  agent-sdk · s06 rev-B · plan for review — not yet implemented · annotate any card, diff line, or risk to queue a change
+</div>
+
+</div>
+
+<!-- ================= code sources (raw, un-escaped) ================= -->
+<script type="text/plain" id="src-llm">"""Claude Agent SDK wrapper — every LLM call runs through your Claude subscription.
+
+All Floor-Plan Studio LLM calls go through the Claude Agent SDK (claude-agent-sdk),
+authenticated by CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token` (Pro/Max/Team/
+Enterprise) — no paid API key. Structured JSON via output_format json-schema; the
+agent runs tool-free and single-turn, so one call == one validated model back.
+AGENT_MODE=echo still runs LLM-free; no token while llm-mode raises a clear error.
+"""
+
+from __future__ import annotations
+
+import os
+from collections.abc import AsyncIterator
+from typing import Any, TypeVar
+
+from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+from pydantic import BaseModel
+
+MODEL = os.environ.get("PLAN_AGENT_MODEL", "claude-opus-4-8")
+VISION_MODEL = os.environ.get("VISION_MODEL", "claude-opus-4-8")
+AGENT_MODE = os.environ.get("AGENT_MODE", "llm")  # llm | echo
+
+T = TypeVar("T", bound=BaseModel)
+
+
+def auth_configured() -> bool:
+    return bool(os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"))
+
+
+def _require_auth() -> None:
+    if not auth_configured():
+        raise RuntimeError(
+            "CLAUDE_CODE_OAUTH_TOKEN is not set. Floor-Plan Studio runs on your Claude "
+            "subscription via the Agent SDK — generate a token with `claude setup-token` "
+            "and export it (and unset ANTHROPIC_API_KEY), or run with AGENT_MODE=echo."
+        )
+
+
+async def _prompt(text: str, image: dict[str, Any] | None) -> AsyncIterator[dict[str, Any]]:
+    content: list[dict[str, Any]] = []
+    if image is not None:
+        content.append(image)
+    content.append({"type": "text", "text": text})
+    yield {"type": "user", "message": {"role": "user", "content": content}}
+
+
+async def parse_structured(
+    output_type: type[T],
+    system: str,
+    text: str,
+    *,
+    image: dict[str, Any] | None = None,
+    model: str = MODEL,
+) -> T:
+    """One tool-free, single-turn call: prompt (+ optional image) -> validated model."""
+    _require_auth()
+    options = ClaudeAgentOptions(
+        model=model,
+        system_prompt=system,
+        allowed_tools=[],   # no filesystem / bash — pure structured extraction
+        max_turns=1,
+        output_format={"type": "json_schema", "schema": output_type.model_json_schema()},
+    )
+    async for message in query(prompt=_prompt(text, image), options=options):
+        if isinstance(message, ResultMessage) and message.structured_output is not None:
+            return output_type.model_validate(message.structured_output)
+    raise ValueError(f"agent returned no structured output for {output_type.__name__}")
+</script>
+
+<script type="text/plain" id="ingest-old">VISION_MODEL = os.environ.get("VISION_MODEL", "anthropic:claude-opus-4-8")
+
+# ... DraftPlan / INSTRUCTIONS unchanged ...
+
+_agent: Agent[None, DraftPlan] | None = None
+
+
+def get_agent() -> Agent[None, DraftPlan]:
+    global _agent
+    if _agent is None:
+        _agent = Agent(VISION_MODEL, output_type=DraftPlan, instructions=INSTRUCTIONS, retries=1)
+    return _agent
+
+
+async def run_ingest(image_b64: str, media_type: str, address: str) -> dict[str, Any]:
+    agent = get_agent()
+    run = await agent.run(
+        [
+            f"Extract the floor plan geometry. Address (if known): {address or 'unknown'}.",
+            BinaryContent(data=base64.b64decode(image_b64), media_type=media_type),
+        ]
+    )
+    draft = run.output
+    v1 = {...}
+    geo = convert_v1(v1)
+</script>
+
+<script type="text/plain" id="ingest-new"># imports: drop base64, pydantic_ai Agent/BinaryContent
+from plan_agent.llm import VISION_MODEL, parse_structured
+
+# ... DraftPlan / INSTRUCTIONS unchanged ...
+
+
+async def run_ingest(image_b64: str, media_type: str, address: str) -> dict[str, Any]:
+    draft = await parse_structured(
+        DraftPlan,
+        INSTRUCTIONS,
+        f"Extract the floor plan geometry. Address (if known): {address or 'unknown'}.",
+        image={
+            "type": "image",
+            "source": {"type": "base64", "media_type": media_type, "data": image_b64},
+        },
+        model=VISION_MODEL,
+    )
+    v1 = {...}
+    geo = convert_v1(v1)
+</script>
+
+<script type="text/plain" id="agent-old">from pydantic_ai import Agent
+
+MODEL = os.environ.get("PLAN_AGENT_MODEL", "deepseek:deepseek-chat")
+AGENT_MODE = os.environ.get("AGENT_MODE", "llm")
+
+_agent: Agent[None, OpsPlan] | None = None
+
+
+def get_agent() -> Agent[None, OpsPlan]:
+    global _agent
+    if _agent is None:
+        _agent = Agent(MODEL, output_type=OpsPlan, instructions=SYSTEM, retries=2)
+    return _agent
+
+
+# inside run_ops_agent(...), the retry loop:
+    agent = get_agent()
+    feedback = ""
+    for attempt in range(3):
+        run = await agent.run(prompt + feedback)
+        plan = run.output
+        # ... parse_ops -> apply_ops -> validate -> feedback (UNCHANGED) ...
+</script>
+
+<script type="text/plain" id="agent-new"># MODEL / AGENT_MODE now live in llm.py
+from plan_agent.llm import AGENT_MODE, MODEL, parse_structured
+
+# get_agent() deleted entirely.
+
+
+# inside run_ops_agent(...), the retry loop:
+    feedback = ""
+    for attempt in range(3):
+        plan = await parse_structured(OpsPlan, SYSTEM, prompt + feedback, model=MODEL)
+        # ... parse_ops -> apply_ops -> validate -> feedback (UNCHANGED) ...
+</script>
+
+<script type="text/plain" id="comps-old">from pydantic_ai import Agent
+
+COMPS_MODEL = os.environ.get("PLAN_AGENT_MODEL", "deepseek:deepseek-chat")
+
+_agent: Agent[None, CompsList] | None = None
+
+
+def get_agent() -> Agent[None, CompsList]:
+    global _agent
+    if _agent is None:
+        _agent = Agent(COMPS_MODEL, output_type=CompsList, instructions=COMPS_SYS, retries=1)
+    return _agent
+
+
+# inside run_comps(...), after building `blob` from Tavily results:
+    run = await get_agent().run(
+        f"Search query: {query}\nTarget configuration: {config}\n\nRESULTS:\n{blob}"
+    )
+    return {"comps": [c.model_dump() for c in run.output.comps], "note": "live via Tavily"}
+</script>
+
+<script type="text/plain" id="comps-new">from plan_agent.llm import MODEL, parse_structured
+
+# get_agent() deleted; COMPS_SYS kept as a module constant.
+
+
+# inside run_comps(...), after building `blob` from Tavily results:
+    result = await parse_structured(
+        CompsList,
+        COMPS_SYS,
+        f"Search query: {q}\nTarget configuration: {config}\n\nRESULTS:\n{blob}",
+        model=MODEL,
+    )
+    return {"comps": [c.model_dump() for c in result.comps], "note": "live via Tavily"}
+</script>
+
+<script type="text/plain" id="pyproject-old">dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic-ai-slim[openai,anthropic]>=1.44",
+    "httpx>=0.27",
+    "plan-core",
+]
+</script>
+
+<script type="text/plain" id="pyproject-new">dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "claude-agent-sdk>=0.1",   # bundles the Claude Code CLI; no Node needed
+    "httpx>=0.27",
+    "plan-core",
+]
+</script>
+
+<script type="text/plain" id="env-old"># P3 geometry-ops agent loop — default provider (spec decision D5)
+DEEPSEEK_API_KEY=sk-...
+
+# P4 vision ingestion + quality escalation (required for image -> geometry; D5)
+ANTHROPIC_API_KEY=sk-ant-...
+
+# P5 rent comparables web search (search provider swappable)
+TAVILY_API_KEY=tvly-...
+</script>
+
+<script type="text/plain" id="env-new"># REQUIRED — runs all LLM features on YOUR Claude subscription (ops, comps, vision).
+# One-time: `claude setup-token` (Pro/Max) -> paste the 1-year token here.
+CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
+
+# DO NOT set ANTHROPIC_API_KEY — it outranks the token above and bills API credits.
+
+# P5 rent comparables web search (search provider swappable)
+TAVILY_API_KEY=tvly-...
+</script>
+
+<script type="text/plain" id="compose-old">    environment:
+      PLAN_AGENT_MODEL: ${PLAN_AGENT_MODEL:-deepseek:deepseek-chat}
+      VISION_MODEL: ${VISION_MODEL:-anthropic:claude-opus-4-8}
+      AGENT_MODE: ${AGENT_MODE:-llm}
+</script>
+
+<script type="text/plain" id="compose-new">    environment:
+      PLAN_AGENT_MODEL: ${PLAN_AGENT_MODEL:-claude-opus-4-8}
+      VISION_MODEL: ${VISION_MODEL:-claude-opus-4-8}
+      AGENT_MODE: ${AGENT_MODE:-llm}
+      # CLAUDE_CODE_OAUTH_TOKEN flows in via env_file: .env
+      # (do NOT put ANTHROPIC_API_KEY here — it would override the subscription token)
+</script>
+
+<script type="text/plain" id="main-old">from plan_agent.agent import AGENT_MODE, MODEL, run_ops_agent
+from plan_agent.comps import run_comps
+from plan_agent.ingest import VISION_MODEL, run_ingest
+
+
+@app.get("/health")
+def health() -> dict[str, Any]:
+    return {"ok": True, "mode": AGENT_MODE, "model": MODEL, "vision_model": VISION_MODEL}
+</script>
+
+<script type="text/plain" id="main-new">from plan_agent.agent import run_ops_agent
+from plan_agent.comps import run_comps
+from plan_agent.ingest import run_ingest
+from plan_agent.llm import AGENT_MODE, MODEL, VISION_MODEL, auth_configured
+
+
+@app.get("/health")
+def health() -> dict[str, Any]:
+    return {
+        "ok": True, "mode": AGENT_MODE, "model": MODEL,
+        "vision_model": VISION_MODEL, "auth": auth_configured(),
+    }
+</script>
+
+<!-- ================= renderers ================= -->
+<script type="module">
+  import { File, FileDiff } from "https://esm.sh/@pierre/diffs@1.2.10?bundle";
+  const opts = { theme: { light: "github-light", dark: "github-dark" }, themeType: "light", overflow: "wrap" };
+  const txt = id => document.getElementById(id).textContent.replace(/^\n/, "");
+
+  new File(opts).render({
+    containerWrapper: document.querySelector("#host-llm"),
+    file: { name: "plan_agent/llm.py", contents: txt("src-llm") },
+  });
+
+  const diffs = [
+    ["#host-ingest",   "plan_agent/ingest.py",  "ingest-old",    "ingest-new",    "unified"],
+    ["#host-agent",    "plan_agent/agent.py",   "agent-old",     "agent-new",     "unified"],
+    ["#host-comps",    "plan_agent/comps.py",   "comps-old",     "comps-new",     "unified"],
+    ["#host-pyproject","pyproject.toml",        "pyproject-old", "pyproject-new", "unified"],
+    ["#host-env",      ".env.example",          "env-old",       "env-new",       "unified"],
+    ["#host-compose",  "docker-compose.yml",    "compose-old",   "compose-new",   "unified"],
+    ["#host-main",     "plan_agent/main.py",    "main-old",      "main-new",      "unified"],
+  ];
+  for (const [sel, name, oldId, newId, style] of diffs) {
+    new FileDiff({ ...opts, diffStyle: style }).render({
+      containerWrapper: document.querySelector(sel),
+      oldFile: { name, contents: txt(oldId) },
+      newFile: { name, contents: txt(newId) },
+    });
+  }
+</script>
+
+<!-- ================= mermaid ================= -->
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "base",
+    themeVariables: {
+      fontFamily: "'SF Mono', ui-monospace, Menlo, monospace",
+      fontSize: "12px",
+      primaryColor: "#ffffff",
+      primaryTextColor: "#141416",
+      primaryBorderColor: "#141416",
+      lineColor: "#141416",
+      secondaryColor: "#f4f4f5",
+      tertiaryColor: "#ffffff",
+      clusterBkg: "#f4f4f5",
+      clusterBorder: "#141416",
+    },
+  });
+</script>
+</body>
+</html>

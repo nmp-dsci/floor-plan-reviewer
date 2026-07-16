@@ -8,12 +8,18 @@ from typing import Any
 
 import httpx
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent
+
+from plan_agent.llm import MODEL, parse_structured
 
 log = logging.getLogger("plan-agent.comps")
 
-COMPS_MODEL = os.environ.get("PLAN_AGENT_MODEL", "deepseek:deepseek-chat")
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
+
+COMPS_SYS = (
+    "Extract rental comparables from web search results for an Australian suburb. "
+    "Only include listings with an explicit weekly rent (AUD $/week) and a "
+    "bedroom/bathroom configuration. Never invent listings."
+)
 
 
 class Comp(BaseModel):
@@ -25,25 +31,6 @@ class Comp(BaseModel):
 
 class CompsList(BaseModel):
     comps: list[Comp] = Field(description="Only comps with an explicit weekly rent figure")
-
-
-_agent: Agent[None, CompsList] | None = None
-
-
-def get_agent() -> Agent[None, CompsList]:
-    global _agent
-    if _agent is None:
-        _agent = Agent(
-            COMPS_MODEL,
-            output_type=CompsList,
-            instructions=(
-                "Extract rental comparables from web search results for an Australian suburb. "
-                "Only include listings with an explicit weekly rent (AUD $/week) and a "
-                "bedroom/bathroom configuration. Never invent listings."
-            ),
-            retries=1,
-        )
-    return _agent
 
 
 async def run_comps(address: str, config: str) -> dict[str, Any]:
@@ -68,7 +55,11 @@ async def run_comps(address: str, config: str) -> dict[str, Any]:
     if not results:
         return {"comps": [], "note": "no search results"}
     blob = "\n\n".join(f"{r.get('title')}\n{r.get('url')}\n{r.get('content')}" for r in results)
-    run = await get_agent().run(
-        f"Search query: {query}\nTarget configuration: {config}\n\nRESULTS:\n{blob}"
+    result = await parse_structured(
+        CompsList,
+        COMPS_SYS,
+        f"Search query: {query}\nTarget configuration: {config}\n\nRESULTS:\n{blob}",
+        model=MODEL,
+        effort="low",
     )
-    return {"comps": [c.model_dump() for c in run.output.comps], "note": "live via Tavily"}
+    return {"comps": [c.model_dump() for c in result.comps], "note": "live via Tavily"}

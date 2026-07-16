@@ -28,6 +28,25 @@ export interface FeatureDef {
   check?: (ctx: CheckCtx) => Promise<void>;
 }
 
+/** Keyboard/mouse shortcuts — the single source for the in-app shortcut sheet (?),
+ * kept beside the capability registry so the two never drift. Each entry maps to a
+ * handler in Review.tsx / PlanCanvas.tsx. */
+export interface Shortcut {
+  keys: string;
+  action: string;
+}
+
+export const SHORTCUTS: Shortcut[] = [
+  { keys: 'Click', action: 'Select a room, wall, fixture or opening' },
+  { keys: 'Shift-click', action: 'Add to / remove from the selection' },
+  { keys: 'Drag', action: 'Move a room — neighbours trade space (Alt = free move)' },
+  { keys: '⌘C / ⌘V', action: 'Copy and paste the selected object' },
+  { keys: '⌘Z', action: 'Undo the last edit, then roll back the last version' },
+  { keys: 'Delete', action: 'Remove the selected object(s)' },
+  { keys: 'Esc', action: 'Clear the selection' },
+  { keys: '?', action: 'Open this shortcut sheet' },
+];
+
 const expect = (cond: boolean, msg: string): void => {
   if (!cond) throw new Error(msg);
 };
@@ -108,7 +127,7 @@ export const FEATURES: FeatureDef[] = [
     id: 'room-move-resize',
     group: 'Rooms',
     feature: 'Move / resize',
-    human: 'Drag the body (0.05m snap) or corner handle; numeric x/y/w/h fields',
+    human: 'Drag the body (0.05m snap) or corner handle — neighbours reflow/swap to trade space (Alt = free move); numeric x/y/w/h fields',
     ai: 'resize_room',
     example: 'shrink a bedroom 0.2m',
     check: async (ctx) => {
@@ -131,7 +150,7 @@ export const FEATURES: FeatureDef[] = [
     group: 'Rooms',
     feature: 'Add room',
     human: '+ Room → drag out the space → name it (field auto-focused)',
-    ai: 'add_room (incl. from a region target)',
+    ai: 'add_room',
     example: 'butlers pantry 1.5×2.0m in free space',
     check: async (ctx) => {
       // find free space: use the envelope edge next to the smallest room... simplest:
@@ -354,7 +373,7 @@ export const FEATURES: FeatureDef[] = [
     id: 'opening-modify',
     group: 'Walls & openings',
     feature: 'Move / retype / remove opening',
-    human: 'Drag end handles · door/window/open toggle · Delete',
+    human: 'Drag end handles, or the middle to slide it along the wall · door/window/open toggle · Delete',
     ai: 'modify_opening / remove_opening',
     example: 'door → window, then remove',
     check: async (ctx) => {
@@ -457,15 +476,6 @@ export const FEATURES: FeatureDef[] = [
     kind: 'op',
   },
   // ---------- space, batch & versions ----------
-  {
-    id: 'region-target',
-    group: 'Space, batch & versions',
-    feature: 'Target empty space',
-    human: '+ Room drag → name it yourself or send the region to the agent',
-    ai: 'Region rect in comment targets → add_room',
-    example: 'space 2.0×2.5m → “build a butlers pantry here”',
-    kind: 'gesture',
-  },
   {
     id: 'batch-apply',
     group: 'Space, batch & versions',
@@ -573,5 +583,15 @@ export const FEATURES: FeatureDef[] = [
       });
     },
     kind: 'contract',
+  },
+  // ---------- product health ----------
+  {
+    id: 'golden-path',
+    group: 'Product health',
+    feature: 'Golden path — 231 PFR',
+    human: 'Load 231 Peats Ferry Rd → maximise weekly rent inside the existing envelope',
+    ai: 'Agent re-prices the maximised layout from ≥ 3 live comps',
+    example: 'garage → Bed 4 · balcony → living · Bed 1 WIR + ensuite · front door to lounge',
+    kind: 'gesture', // covered by the always-run Playwright golden path (make -C app golden)
   },
 ];

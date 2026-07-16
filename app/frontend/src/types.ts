@@ -9,6 +9,12 @@ export interface Room {
   h: number;
   fill: 'white' | 'grey';
   z: number;
+  level: string;
+}
+
+export interface PlanLevel {
+  id: string;
+  name: string;
 }
 
 export type OpeningType = 'door' | 'window' | 'open';
@@ -36,6 +42,7 @@ export interface Fixture {
   w: number;
   h: number;
   label: string;
+  level: string;
 }
 
 export interface PlanGeometry {
@@ -138,19 +145,11 @@ export interface OpeningSelection {
   wallId: string;
 }
 
-export interface Region {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
 export interface Selection {
   rooms: string[];
   walls: WallSelection[];
   fixtures: string[];
   openings: OpeningSelection[];
-  region?: Region | null;
 }
 
 export const emptySelection = (): Selection => ({
@@ -158,15 +157,13 @@ export const emptySelection = (): Selection => ({
   walls: [],
   fixtures: [],
   openings: [],
-  region: null,
 });
 
 export const hasSelection = (s: Selection): boolean =>
   s.rooms.length > 0 ||
   s.walls.length > 0 ||
   s.fixtures.length > 0 ||
-  s.openings.length > 0 ||
-  Boolean(s.region);
+  s.openings.length > 0;
 
 export type Tool = 'select' | 'add-opening' | 'add-fixture' | 'add-room' | 'add-wall';
 

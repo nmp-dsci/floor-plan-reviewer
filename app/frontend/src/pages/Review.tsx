@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, subscribe } from '../api';
+import CanvasStage from '../components/CanvasStage';
 import ChangeList from '../components/ChangeList';
+import Coach from '../components/Coach';
 import ContextBar from '../components/ContextBar';
+import type { DockTab } from '../components/Dock';
+import Dock from '../components/Dock';
 import Inspector from '../components/Inspector';
+import LevelTabs from '../components/LevelTabs';
 import PlanCanvas from '../components/PlanCanvas';
 import Register from '../components/Register';
+import RentPanel from '../components/RentPanel';
+import ReviewStrip from '../components/ReviewStrip';
+import ShortcutSheet from '../components/ShortcutSheet';
+import { envelopeForLevel, levelGeometry, planLevels, viewport } from '../geometry';
 import type { Op, PendingEntry } from '../editing';
 import {
   applyOpsPreview,
@@ -53,6 +62,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
   const [original, setOriginal] = useState<PlanGeometry | null>(null);
   const [registers, setRegisters] = useState<Map<number, RegisterHunk[]>>(new Map());
   const [mode, setMode] = useState<'proposed' | 'delta'>('proposed');
+  const [activeLevel, setActiveLevel] = useState<string>('');
   const [selection, setSelection] = useState<Selection>(emptySelection());
   const [tool, setTool] = useState<Tool>('select');
   const [pending, setPending] = useState<PendingEntry[]>([]);
@@ -66,11 +76,34 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
   const [busy, setBusy] = useState(false);
   const [clipboard, setClipboard] = useState<Clipboard>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [dockTab, setDockTab] = useState<DockTab>('edit');
+  const [showSheet, setShowSheet] = useState(false);
   const [banner, setBanner] = useState<{ kind: 'busy' | 'error' | 'ok'; text: string } | null>(null);
   const currentNRef = useRef<number | null>(null);
   currentNRef.current = currentN;
 
   useEffect(() => onBusyChange?.(busy), [busy, onBusyChange]);
+  // selecting an object raises the EDIT tab (direct-edit lane); the AGENT tab is
+  // reached manually and carries a queued-comments badge.
+  useEffect(() => {
+    if (hasSelection(selection)) setDockTab('edit');
+  }, [selection]);
+
+  // `?` toggles the shortcut sheet (F11); Esc closes it. Ignored while typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if (e.key === '?') {
+        e.preventDefault();
+        setShowSheet((s) => !s);
+      } else if (e.key === 'Escape') {
+        setShowSheet(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   useEffect(() => {
     localStorage.setItem(queueKey(reviewId), JSON.stringify(queue));
   }, [queue, reviewId]);
@@ -144,6 +177,35 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
     [reviewId, loadReview, onVersionAdded],
   );
 
+  // Undo: pop the last pending edit if any, else roll back the head version.
+  // Shared by ⌘Z and the on-canvas Undo control.
+  const handleUndo = useCallback(() => {
+    if (pending.length > 0) {
+      if (busy) return;
+      setPending((p) => p.slice(0, -1));
+      return;
+    }
+    const h = review?.head_n ?? 0;
+    if (!review || currentN !== review.head_n || h <= 0 || busy) return;
+    setBusy(true);
+    setBanner({ kind: 'busy', text: `Undoing v${String(h).padStart(2, '0')}…` });
+    api
+      .deleteVersion(reviewId, h)
+      .then((res) => {
+        setBusy(false);
+        setBanner({
+          kind: 'ok',
+          text: `Undid v${String(res.deleted).padStart(2, '0')} — v${String(res.head_n).padStart(2, '0')} is editable.`,
+        });
+        return loadReview(true);
+      })
+      .then(() => onVersionAdded?.())
+      .catch((e2) => {
+        setBusy(false);
+        setBanner({ kind: 'error', text: friendly(e2) });
+      });
+  }, [pending, review, currentN, busy, reviewId, loadReview, onVersionAdded]);
+
   // Keyboard: Delete removes selection; Cmd/Ctrl+C copies; +V pastes; +Z undoes.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -154,30 +216,8 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
       const key = e.key.toLowerCase();
 
       if (mod && key === 'z') {
-        if (pending.length > 0) {
-          e.preventDefault();
-          setPending((p) => p.slice(0, -1));
-        } else if (review.head_n && review.head_n > 0 && !busy) {
-          e.preventDefault();
-          const h = review.head_n;
-          setBusy(true);
-          setBanner({ kind: 'busy', text: `Undoing v${String(h).padStart(2, '0')}…` });
-          api
-            .deleteVersion(reviewId, h)
-            .then((res) => {
-              setBusy(false);
-              setBanner({
-                kind: 'ok',
-                text: `Undid v${String(res.deleted).padStart(2, '0')} — v${String(res.head_n).padStart(2, '0')} is editable.`,
-              });
-              return loadReview(true);
-            })
-            .then(() => onVersionAdded?.())
-            .catch((e2) => {
-              setBusy(false);
-              setBanner({ kind: 'error', text: friendly(e2) });
-            });
-        }
+        e.preventDefault();
+        handleUndo();
         return;
       }
 
@@ -235,7 +275,9 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
 
       if (mod && key === 'v' && clipboard) {
         e.preventDefault();
-        const env = (detail.geometry.meta.envelope as [number, number, number, number]) ?? [0, 0, 99, 99];
+        const lvls = planLevels(detail.geometry);
+        const lv = lvls.some((l) => l.id === activeLevel) ? activeLevel : (lvls[0]?.id ?? 'level-1');
+        const env = envelopeForLevel(detail.geometry, lv);
         if (clipboard.kind === 'room') {
           const r = clipboard.data;
           const at = placeCopy(r, env);
@@ -269,7 +311,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, currentN, review, detail, clipboard, pending, busy, reviewId, loadReview, onVersionAdded]);
+  }, [selection, currentN, review, detail, clipboard, pending, busy, reviewId, loadReview, onVersionAdded, activeLevel, handleUndo]);
 
   if (!review || currentN === null || !detail) {
     return <div className="banner">Loading review…</div>;
@@ -286,7 +328,26 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
   const previewGeo = pending.length > 0 ? applyOpsPreview(detail.geometry, pending) : detail.geometry;
   const pendingMarks = touchedIds(pending);
 
-  function queueOps(ops: Op[]) {
+  // levels: storeys + detached structures. `active` is always a valid level id, so a
+  // single-level plan (tabs hidden) still filters to its sole level transparently.
+  const levels = planLevels(detail.geometry);
+  const active = levels.some((l) => l.id === activeLevel) ? activeLevel : (levels[0]?.id ?? 'level-1');
+  const canvasGeo = levelGeometry(previewGeo, active);
+  const canvasOriginal = original ? levelGeometry(original, active) : null;
+  const canvasVp = viewport(canvasGeo);
+  const aspect = canvasVp.width / canvasVp.height;
+  const canUndo = (pending.length > 0 || (atHead && head > 0)) && !busy;
+
+  const changeLevel = (levelId: string) => {
+    setActiveLevel(levelId);
+    setSelection(emptySelection());
+  };
+
+  function queueOps(rawOps: Op[]) {
+    // new rooms/fixtures land on the level currently being viewed
+    const ops = rawOps.map((op) =>
+      (op.op === 'add_room' || op.op === 'add_fixture') && !op.level ? { ...op, level: active } : op,
+    );
     const entries = ops.map((op) => ({ pid: newPid(), op }));
     setPending((p) => [...p, ...entries]);
     // auto-select the created object so the inspector opens focused on its name
@@ -325,7 +386,7 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
     setBusy(true);
     setBanner({ kind: 'busy', text: 'Applying your edits…' });
     api
-      .applyEdits(reviewId, head, ops, describeOps(ops))
+      .applyEdits(reviewId, head, ops, describeOps(ops), active)
       .then((res) => {
         setBusy(false);
         setPending([]);
@@ -379,45 +440,30 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
       });
   };
 
+  const changeVersion = (n: number) => {
+    setCurrentN(n);
+    setPending([]);
+    setSelection(emptySelection());
+  };
+  const refreshComps = () =>
+    api
+      .refreshComps(reviewId)
+      .then(() => loadReview(false))
+      .catch((e) => setBanner({ kind: 'error', text: friendly(e) }));
+
   return (
-    <>
-      <ContextBar
-        review={review}
-        currentN={currentN}
-        mode={mode}
-        busy={busy}
-        onVersion={(n) => {
-          setCurrentN(n);
-          setPending([]);
-          setSelection(emptySelection());
-        }}
-        onMode={setMode}
-        onRefreshComps={() =>
-          api
-            .refreshComps(reviewId)
-            .then(() => loadReview(false))
-            .catch((e) => setBanner({ kind: 'error', text: friendly(e) }))
-        }
-        onDeleteVersion={deleteVersion}
-        onBookmark={bookmarkVersion}
-      />
+    <div className="ws">
+      <ContextBar review={review} currentN={currentN} />
 
       {banner && <div className={`banner ${banner.kind === 'ok' ? '' : banner.kind}`}>{banner.text}</div>}
 
-      <div className="grid">
-        <div>
-          <div className="card">
-            <h2>
-              <span>Plan canvas</span>
-              <small>
-                {atHead
-                  ? 'click to select · drag to move · walls drag sideways · edits batch until you apply'
-                  : 'read-only — jump to head to edit'}
-              </small>
-            </h2>
+      <div className="ws-body">
+        <div className="ws-canvas">
+          <LevelTabs geometry={detail.geometry} active={active} onChange={changeLevel} />
+          <CanvasStage aspect={aspect} onUndo={handleUndo} canUndo={canUndo}>
             <PlanCanvas
-              geometry={previewGeo}
-              original={original}
+              geometry={canvasGeo}
+              original={canvasOriginal}
               mode={mode}
               selection={selection}
               onSelectionChange={setSelection}
@@ -427,99 +473,130 @@ export default function Review({ reviewId, onBusyChange, onVersionAdded }: Props
               onOps={queueOps}
               onRewrite={rewritePending}
               onWallMove={onWallMove}
-              onRegion={(region) => setSelection({ ...emptySelection(), region })}
               pendingIds={pendingMarks}
             />
-            {mode === 'delta' && (
-              <div className="hint">
-                <span style={{ color: 'var(--green)' }}>■ added</span> ·{' '}
-                <span style={{ color: 'var(--red)' }}>□ removed</span> ·{' '}
-                <span style={{ color: 'var(--amber)' }}>□ modified</span>
-              </div>
+          </CanvasStage>
+          {mode === 'delta' && (
+            <div className="delta-legend-float" role="img" aria-label="Delta legend: added, removed, modified">
+              <span>
+                <span className="g add">＋</span> Added
+              </span>
+              <span>
+                <span className="g rem">−</span> Removed
+              </span>
+              <span>
+                <span className="g mod">△</span> Modified
+              </span>
+            </div>
+          )}
+          <div className="ws-canvas-foot">
+            {!atHead ? (
+              <span className="tip">read-only — jump to the head version to edit</span>
+            ) : mode === 'delta' ? (
+              <span className="tip">comparing the original plan with the current proposal</span>
+            ) : (
+              <span className="tip">
+                click to select · drag a room to reshape neighbours (Alt = free move) · walls drag
+                sideways · edits batch until you apply
+              </span>
             )}
+            <button className="foot-help" onClick={() => setShowSheet(true)} title="Keyboard shortcuts">
+              <span className="mono">?</span> shortcuts
+            </button>
           </div>
         </div>
 
-        <div>
-          <div className="card">
-            <h2>
-              <span>Inspector</span>
-              <small>direct edits — no agent, instant</small>
-            </h2>
-            <Inspector
-              geometry={previewGeo}
-              selection={selection}
-              pending={pending}
-              busy={busy}
-              atHead={atHead}
-              tool={tool}
-              onTool={setTool}
-              onOps={queueOps}
-              onRewrite={rewritePending}
-              onRemovePending={(i) => setPending((p) => p.filter((_, idx) => idx !== i))}
-              onApply={applyEdits}
-              onDiscard={() => {
-                setPending([]);
-                setSelection(emptySelection());
-              }}
-            />
-          </div>
-
-          <div className="card">
-            <h2>
-              <span>Ask the agent</span>
-              <small>comments queue locally — nothing sends until you press send</small>
-            </h2>
-            <ChangeList
-              selection={selection}
-              queue={queue}
-              busy={busy}
-              atHead={atHead}
-              onQueue={(c) => setQueue((q) => [...q, c])}
-              onRemove={(id) => setQueue((q) => q.filter((c) => c.id !== id))}
-              onSend={sendComments}
-              onClearSelection={() => setSelection(emptySelection())}
-            />
-          </div>
-
-          <div className="card">
-            <h2>
-              <span>Change register</span>
-              {allHunks.length > 1 && (
-                <button className="ghost register-toggle" onClick={() => setRegisterOpen((o) => !o)}>
-                  {registerOpen ? 'collapse ▲' : `expand all (${allHunks.length}) ▾`}
-                </button>
-              )}
-            </h2>
-            <Register hunks={allHunks} open={registerOpen} />
-          </div>
-
-          <div className="card">
-            <h2>
-              <span>Rent evidence</span>
-              <small>{review.comps.length} live comp{review.comps.length === 1 ? '' : 's'}</small>
-            </h2>
-            <div className="body">
-              {review.comps.length === 0 && (
-                <span style={{ color: 'var(--faint)', fontSize: 13 }}>No comps recorded yet.</span>
-              )}
-              <ul className="comps">
-                {review.comps.map((c, i) => (
-                  <li key={i}>
-                    <b>${c.rent_per_week}/wk</b> — {c.address} ({c.config}) ·{' '}
-                    <span style={{ color: 'var(--faint)' }}>{c.source}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+        <div className="ws-dock">
+          <Dock
+            tab={dockTab}
+            onTab={setDockTab}
+            panels={[
+              {
+                id: 'edit',
+                label: 'Edit',
+                node: (
+                  <Inspector
+                    geometry={canvasGeo}
+                    selection={selection}
+                    pending={pending}
+                    busy={busy}
+                    atHead={atHead}
+                    tool={tool}
+                    onTool={setTool}
+                    onOps={queueOps}
+                    onRewrite={rewritePending}
+                    onRemovePending={(i) => setPending((p) => p.filter((_, idx) => idx !== i))}
+                    onApply={applyEdits}
+                    onDiscard={() => {
+                      setPending([]);
+                      setSelection(emptySelection());
+                    }}
+                  />
+                ),
+              },
+              {
+                id: 'agent',
+                label: 'Agent',
+                badge: queue.length,
+                node: (
+                  <ChangeList
+                    selection={selection}
+                    queue={queue}
+                    busy={busy}
+                    atHead={atHead}
+                    onQueue={(c) => setQueue((q) => [...q, c])}
+                    onRemove={(id) => setQueue((q) => q.filter((c) => c.id !== id))}
+                    onSend={sendComments}
+                    onClearSelection={() => setSelection(emptySelection())}
+                  />
+                ),
+              },
+              {
+                id: 'history',
+                label: 'History',
+                node: (
+                  <>
+                    {allHunks.length > 1 && (
+                      <div className="dock-subhead">
+                        <span>Change register</span>
+                        <button
+                          className="ghost register-toggle"
+                          onClick={() => setRegisterOpen((o) => !o)}
+                        >
+                          {registerOpen ? 'collapse ▲' : `expand all (${allHunks.length}) ▾`}
+                        </button>
+                      </div>
+                    )}
+                    <Register hunks={allHunks} open={registerOpen} />
+                  </>
+                ),
+              },
+              {
+                id: 'rent',
+                label: 'Rent',
+                node: <RentPanel review={review} />,
+              },
+            ]}
+          />
         </div>
       </div>
-      <footer>
-        Concept proposals — not architectural, planning, or financial advice. Envelope is immutable;
-        every edit — human or agent — is validated before it lands.
-      </footer>
-    </>
+
+      <ReviewStrip
+        review={review}
+        currentN={currentN}
+        head={head}
+        mode={mode}
+        busy={busy}
+        onVersion={changeVersion}
+        onMode={setMode}
+        onBookmark={bookmarkVersion}
+        onDeleteVersion={deleteVersion}
+        onRefreshComps={refreshComps}
+      />
+
+      <Coach />
+      {showSheet && <ShortcutSheet onClose={() => setShowSheet(false)} />}
+    </div>
   );
 }
 

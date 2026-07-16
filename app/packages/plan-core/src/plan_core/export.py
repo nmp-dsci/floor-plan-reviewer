@@ -7,12 +7,13 @@ fixtures, address title block with auto-computed internal area.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 from plan_core.dims import clear_dims_label, clear_internal_area
-from plan_core.schema import PlanGeometry, Room, Wall
+from plan_core.schema import Fixture, PlanGeometry, Room, Wall
 
 BLACK = (20, 20, 22)
 WHITE = (255, 255, 255)
@@ -118,27 +119,31 @@ def _wall_rect(w: Wall, ox: float, oy: float) -> tuple[float, float, float, floa
     )
 
 
-def render_png(
-    geo: PlanGeometry,
-    out_path: str | Path,
-    floor_label: str = "",
-    subtitle: str = "",
-) -> Path:
-    ex0, ey0, ex1, ey1 = geo.envelope()
-    margin = round(MARGIN_M * PX_PER_M)
-    ox = margin - ex0 * PX_PER_M
-    oy = margin - ey0 * PX_PER_M
-    title_lines = [t for t in (floor_label, geo.address, subtitle) if t]
-    title_h = 90 + 34 * len(title_lines)
-    width = round((ex1 - ex0) * PX_PER_M) + 2 * margin
-    height = round((ey1 - ey0) * PX_PER_M) + 2 * margin + title_h
+@dataclass
+class _Panel:
+    """One level laid out for side-by-side rendering."""
 
-    image = Image.new("RGB", (width, height), WHITE)
-    draw = ImageDraw.Draw(image)
+    name: str
+    rooms: list[Room]
+    walls: list[Wall]
+    fixtures: list[Fixture]
+    ex0: float
+    ey0: float
+    pw: int
+    ph: int
 
+
+def _draw_plan(
+    draw: ImageDraw.ImageDraw,
+    rooms: list[Room],
+    walls: list[Wall],
+    fixtures: list[Fixture],
+    ox: float,
+    oy: float,
+) -> None:
+    """Draw one plan (a single level's rooms/walls/openings/fixtures/labels) at offset."""
     for z in (0, 1):
-        rooms = [r for r in geo.rooms if r.z == z]
-        for room in rooms:
+        for room in (r for r in rooms if r.z == z):
             draw.rectangle(
                 (
                     ox + room.x * PX_PER_M,
@@ -148,14 +153,14 @@ def render_png(
                 ),
                 fill=GREY if room.fill == "grey" else WHITE,
             )
-        nested_ids = {r.id for r in geo.rooms if r.z != 0}
-        for wall in geo.walls:
+        nested_ids = {r.id for r in rooms if r.z != 0}
+        for wall in walls:
             wall_is_nested = wall.a in nested_ids or wall.b in nested_ids
             if (z == 1) == wall_is_nested:
                 draw.rectangle(_wall_rect(wall, ox, oy), fill=BLACK)
 
     # openings punch through their wall; windows keep two thin edge lines
-    for wall in geo.walls:
+    for wall in walls:
         half = (EXTERIOR_HALF if wall.b == "exterior" else INTERIOR_HALF) * PX_PER_M + 2
         for o in wall.openings:
             a0, a1 = wall.t_to_abs(o.t0), wall.t_to_abs(o.t1)
@@ -174,7 +179,7 @@ def render_png(
                     draw.line((x0, y0 + 1, x1, y0 + 1), fill=BLACK, width=2)
                     draw.line((x0, y1 - 1, x1, y1 - 1), fill=BLACK, width=2)
 
-    for fx in geo.fixtures:
+    for fx in fixtures:
         draw.rectangle(
             (
                 ox + fx.x * PX_PER_M,
@@ -186,10 +191,67 @@ def render_png(
             width=2,
         )
 
-    for room in geo.rooms:
-        _draw_labels(draw, room, geo.walls, ox, oy)
+    for room in rooms:
+        _draw_labels(draw, room, walls, ox, oy)
 
-    ty = round((ey1 - ey0) * PX_PER_M) + 2 * margin + 20
+
+def render_png(
+    geo: PlanGeometry,
+    out_path: str | Path,
+    floor_label: str = "",
+    subtitle: str = "",
+) -> Path:
+    margin = round(MARGIN_M * PX_PER_M)
+    levels = geo.levels()
+    multi = len(levels) > 1
+    caption_h = 40 if multi else 0
+    gutter = margin
+
+    room_level = {r.id: r.level for r in geo.rooms}
+    panels: list[_Panel] = []
+    for lvl in levels:
+        lid = lvl["id"]
+        px0, py0, px1, py1 = geo.envelope_for(lid)
+        panels.append(
+            _Panel(
+                name=lvl["name"],
+                rooms=geo.rooms_on(lid),
+                walls=[w for w in geo.walls if room_level.get(w.a) == lid],
+                fixtures=[f for f in geo.fixtures if f.level == lid],
+                ex0=px0,
+                ey0=py0,
+                pw=round((px1 - px0) * PX_PER_M) + 2 * margin,
+                ph=round((py1 - py0) * PX_PER_M) + 2 * margin,
+            )
+        )
+
+    plans_w = sum(p.pw for p in panels) + gutter * (len(panels) - 1)
+    plans_h = max(p.ph for p in panels)
+    title_lines = [t for t in (floor_label, geo.address, subtitle) if t]
+    title_h = 90 + 34 * len(title_lines)
+    width = plans_w
+    height = caption_h + plans_h + title_h
+
+    image = Image.new("RGB", (width, height), WHITE)
+    draw = ImageDraw.Draw(image)
+
+    cursor_x = 0
+    for p in panels:
+        ox = cursor_x + margin - p.ex0 * PX_PER_M
+        oy = caption_h + margin - p.ey0 * PX_PER_M
+        if multi:
+            cap = _font(18, bold=True)
+            name = p.name.upper()
+            draw.text(
+                (cursor_x + (p.pw - draw.textlength(name, font=cap)) / 2, 10),
+                name,
+                font=cap,
+                fill=BLACK,
+            )
+        _draw_plan(draw, p.rooms, p.walls, p.fixtures, ox, oy)
+        cursor_x += p.pw + gutter
+
+    ty = caption_h + plans_h + 20
     for i, line in enumerate(title_lines):
         font = _font(26 if i < 2 else 18, bold=i < 2)
         text = str(line).upper()

@@ -1,14 +1,14 @@
 [project]
 name = "plan-agent"
 version = "0.1.0"
-description = "Floor-Plan Studio agent: comments → typed geometry ops (DeepSeek default), Claude vision ingest, Tavily rent comps."
+description = "Floor-Plan Studio agent: comments → typed geometry ops + Claude vision ingest via the Claude Agent SDK (subscription auth), Tavily rent comps."
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
-    "pydantic-ai-slim[openai,anthropic]>=1.44",
     "httpx>=0.27",
     "plan-core",
+    "claude-agent-sdk>=0.2.117",
 ]
 
 [dependency-groups]

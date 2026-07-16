@@ -22,6 +22,14 @@ Kind = Literal[
 OpeningType = Literal["door", "window", "open"]
 
 
+DEFAULT_LEVEL = "level-1"
+
+
+def level_name(level_id: str) -> str:
+    """Human label for a level id: 'level-1' → 'Level 1', 'garage' → 'Garage'."""
+    return level_id.replace("-", " ").replace("_", " ").title()
+
+
 class Room(BaseModel):
     id: str
     name: str
@@ -33,6 +41,7 @@ class Room(BaseModel):
     h: float
     fill: Literal["white", "grey"] = "white"
     z: int = 0  # z=1 nests inside a z=0 parent (robes, pantry)
+    level: str = DEFAULT_LEVEL  # storey/structure this room belongs to; own coord origin
 
     @property
     def x2(self) -> float:
@@ -119,6 +128,7 @@ class Fixture(BaseModel):
     w: float
     h: float
     label: str = ""
+    level: str = DEFAULT_LEVEL
 
     def describe(self) -> str:
         name = (self.label or "fixture").lower()
@@ -195,6 +205,32 @@ class PlanGeometry(BaseModel):
                     return w, o
         raise KeyError(f"no opening '{oid}'")
 
+    # ---- levels (storeys / detached structures; each has its own coord origin) ----
+
+    def level_ids(self) -> list[str]:
+        """Ordered level ids: from meta['levels'] if present, else first-seen room order."""
+        meta_levels = self.meta.get("levels")
+        if meta_levels:
+            return [str(lvl["id"]) for lvl in meta_levels]
+        seen: list[str] = []
+        for r in self.rooms:
+            if r.level not in seen:
+                seen.append(r.level)
+        return seen or [DEFAULT_LEVEL]
+
+    def levels(self) -> list[dict[str, str]]:
+        """Ordered [{id, name}] for the tab strip — derived when meta is absent."""
+        meta_levels = self.meta.get("levels")
+        if meta_levels:
+            return [
+                {"id": str(lvl["id"]), "name": str(lvl.get("name") or level_name(lvl["id"]))}
+                for lvl in meta_levels
+            ]
+        return [{"id": lid, "name": level_name(lid)} for lid in self.level_ids()]
+
+    def rooms_on(self, level_id: str) -> list[Room]:
+        return [r for r in self.rooms if r.level == level_id]
+
     def envelope(self) -> tuple[float, float, float, float]:
         env = self.meta.get("envelope")
         if env:
@@ -205,6 +241,26 @@ class PlanGeometry(BaseModel):
         ys1 = max(r.y2 for r in self.rooms)
         return (xs0, ys0, xs1, ys1)
 
+    def envelope_for(self, level_id: str) -> tuple[float, float, float, float]:
+        """Pinned footprint of one level: meta['envelopes'][id], falling back to the
+        legacy single meta['envelope'] (single-level plans) or that level's room bbox."""
+        envelopes = self.meta.get("envelopes") or {}
+        env = envelopes.get(level_id)
+        if env:
+            return (float(env[0]), float(env[1]), float(env[2]), float(env[3]))
+        ids = self.level_ids()
+        if len(ids) == 1 and self.meta.get("envelope"):
+            return self.envelope()
+        rooms = self.rooms_on(level_id)
+        if not rooms:
+            return (0.0, 0.0, 0.0, 0.0)  # roomless level: degenerate, never the whole plan
+        return (
+            min(r.x for r in rooms),
+            min(r.y for r in rooms),
+            max(r.x2 for r in rooms),
+            max(r.y2 for r in rooms),
+        )
+
     def internal_area(self) -> float:
         """Habitable internal area: z=0 rooms, excluding grey (non-habitable) space."""
         return sum(r.area for r in self.rooms if r.z == 0 and r.fill != "grey")
@@ -214,9 +270,13 @@ class PlanGeometry(BaseModel):
         return sum(r.area for r in self.rooms if r.z == 0)
 
     def total_area(self) -> float:
-        """The external envelope footprint (width x length) in square metres."""
-        x0, y0, x1, y1 = self.envelope()
-        return (x1 - x0) * (y1 - y0)
+        """External footprint in m² — summed per level so a detached garage doesn't
+        inflate the figure with the empty gap between structures."""
+        total = 0.0
+        for lid in self.level_ids():
+            x0, y0, x1, y1 = self.envelope_for(lid)
+            total += (x1 - x0) * (y1 - y0)
+        return total
 
     def summary_config(self) -> str:
         beds = sum(1 for r in self.rooms if r.kind == "bedroom")

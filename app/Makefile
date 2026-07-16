@@ -1,4 +1,4 @@
-.PHONY: up down logs test smoke demo demo-whats-new demo-tour demo-videos reseed e2e
+.PHONY: up down logs test smoke golden demo demo-whats-new demo-tour demo-videos reseed e2e
 
 up:
 	docker compose up --build -d
@@ -14,8 +14,16 @@ down:
 logs:
 	docker compose logs -f
 
-test:
+test: golden
 	cd packages/plan-core && uv run pytest -q
+	cd services/plan-agent && uv run pytest -q
+
+# The golden-path regression — 231 Peats Ferry Rd, always run. Deterministic T1
+# (sandbox geometry + on-canvas delta render) gates every phase; the live T2 tier
+# (upload → ingest → re-price) is opt-in via GOLDEN_T2=1 and skipped loudly otherwise.
+# Needs the compose stack up (make up).
+golden:
+	cd demo && uv sync -q && uv run playwright install chromium && uv run python e2e_golden_path.py
 
 smoke:
 	@curl -sf http://localhost:8090/api/health >/dev/null && echo "backend  OK"
