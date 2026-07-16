@@ -59,6 +59,20 @@ font, or spacing value that isn't a token. Current set:
   section labels 9.5–10px uppercase in `#8b8b93`.
 - **Forms**: labels 11px uppercase letterspaced; inputs `border: 2px solid var(--ink)`,
   no radius, paper background.
+- **Dock tabs** (`components/Dock.tsx`): one panel visible at a time, `3px solid var(--ink)`
+  bottom rule on the tab row, active = ink fill + paper text; a red-bordered count chip badges
+  a tab with pending state (e.g. queued comments).
+- **Modal / dialog** (`Coach.tsx`, `ShortcutSheet.tsx`): centred card, same border/header
+  recipe as Card, backdrop dims the page; a bare `✕` glyph button (`.modal-x`) closes it —
+  never an icon font.
+- **Meter** (`RentPanel.tsx`): a bordered bar (`--grey-2` track, `--green-bg` fill,
+  `--ink` border) with a `--amber`-bordered band overlay for the comps range and an ink tick
+  for baseline; numbers stay in `--mono` beside it, never inside the bar.
+- **Card grid + dropzone** (`Library.tsx`): plan cards are the Card recipe with a thumbnail
+  strip on top; the upload card is a dashed `--faint` border that solidifies to ink on
+  drag-over, holding a file preview once one is chosen.
+- **Stepper** (`Ingest.tsx`): numbered steps in one bordered strip; the active step is ink
+  fill + paper text, completed steps show their number in `--green`.
 
 ## Canvas rules — LOCKED (identical across any future restyle)
 
@@ -70,6 +84,10 @@ font, or spacing value that isn't a token. Current set:
   fill) = modified. Never reuse these three for anything else on the canvas.
 - Room labels: uppercase name + mono dims in `--faint`, **always visible on every room** — never
   auto-hidden; shrink to a legible floor on small rooms instead of dropping the dims.
+- Zoom/pan is an outer viewport concern, not a canvas one: `components/CanvasStage.tsx` scales
+  `PlanCanvas.tsx` by resizing its wrapper against the SVG's native `viewBox`, so
+  `getScreenCTM()` and every gesture stay exact. Never add zoom/pan state inside `PlanCanvas.tsx`
+  itself.
 
 ## Do / don't
 
@@ -80,3 +98,6 @@ font, or spacing value that isn't a token. Current set:
 - **Don't** add a new colour without adding a token to `styles.css` first and a row here.
 - **Don't** restyle canvas semantics (ink walls / red selection / green-red-amber delta).
 - **Don't** use icon fonts or emoji in chrome; glyphs like `⤓` and `·` separators are fine.
+- **Do** treat 11px as the practical a11y floor for interactive labels (paired with a visible
+  focus ring and, where relevant, `aria-live`/`aria-*`), not 12px — the existing type scale
+  already runs kickers and hints at 10–12px and forcing everything to 12px would break it.

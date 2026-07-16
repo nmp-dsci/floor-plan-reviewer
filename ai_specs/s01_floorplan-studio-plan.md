@@ -5,6 +5,10 @@
 `app/` — `make -C app up`. P6 (AWS) remains open. This spec is self-contained: a developer/agent
 can implement from it.
 
+(A separate later restyle, `.lavish/s07_restyle-plan.html`, reused the same P0–P5 phase labels for
+its own layout/guidance-only pass over this app's UI — see AGENTS.md "Studio app UI" for what it
+changed; this spec's P0–P6 above are the original build phases.)
+
 ## Goal
 
 Turn the chat/lavish review loop (proven on `231-peats-ferry-rd`, v01–v03) into a local-first web
@@ -90,6 +94,11 @@ additions. That makes diffing set comparison: `add` / `remove` / `modify` per ro
 + open  hall→bed-5    0.9m         door
 ```
 
+**Updated 2026-07-16 (restyle P3):** this raw hunk is still generated from the diff and still the
+audit trail, but the register's default view is now a plain-English sentence per change plus its
+rent contribution — the hunk above sits one "show exact ops" disclosure away. See AGENTS.md
+"Studio app UI" for the current presentation.
+
 ## Architecture (mirrors data-qa-agent)
 
 - **frontend** — React + Vite + TS; d3 SVG canvas, delta view, register, change list. REST + SSE.
@@ -118,6 +127,7 @@ additions. That makes diffing set comparison: `add` / `remove` / `modify` per ro
 | `GET /reviews/{id}/versions/{n}` | Geometry + diff-vs-original + register |
 | `GET /reviews/{id}/events` | SSE: job progress, `version.ready` |
 | `GET /reviews/{id}/versions/{n}/export.png` | Pillow render — parity with chat workflow |
+| `DELETE /plans/{id}` | Remove a dead-draft plan (unlinks files under `STORAGE_DIR` only); refuses the seed plan and sandbox plans (P4 restyle, §s07) |
 
 ## Phases — every phase ends runnable locally (`make up`)
 

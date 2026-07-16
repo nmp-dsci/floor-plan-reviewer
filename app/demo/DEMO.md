@@ -7,6 +7,12 @@
 > Read the "DeepSeek AGENT" / "Pydantic AI on DeepSeek" mentions below as historical; the loop they
 > show is unchanged, only the LLM backend differs. The videos/SRT and scripts are intentionally left
 > as-is (re-recording is a separate task).
+>
+> **Also predate the Drafting Ink 2.0 restyle (2026-07-16).** All three videos show the pre-restyle
+> review page (stacked Inspector/Ask-the-Agent/Register/Rent cards, no zoom/fit controls). The
+> current review page is a canvas-first workspace with a tabbed dock (EDIT/AGENT/HISTORY/RENT) and
+> a bottom version/lens strip — same underlying loop, different layout. See AGENTS.md "Studio app
+> UI" for what changed.
 
 Three narrated videos, each a real unedited Playwright session against the local compose stack
 (`make -C app up`). **Narration is spoken** (Deepgram Aura TTS, Australian voice
